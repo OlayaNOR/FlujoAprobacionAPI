@@ -18,6 +18,10 @@ final class TokenDePrueba {
         return firmado(IntegracionBase.SECRETO_JWT, Instant.now().plus(Duration.ofMinutes(5)), roles);
     }
 
+    static String para(UUID usuario, String... roles) {
+        return firmado(IntegracionBase.SECRETO_JWT, usuario, Instant.now().plus(Duration.ofMinutes(5)), roles);
+    }
+
     static String vencido() {
         return firmado(IntegracionBase.SECRETO_JWT, Instant.now().minus(Duration.ofHours(1)), "ADMIN");
     }
@@ -27,8 +31,12 @@ final class TokenDePrueba {
     }
 
     private static String firmado(String secreto, Instant expira, String... roles) {
+        return firmado(secreto, UUID.randomUUID(), expira, roles);
+    }
+
+    private static String firmado(String secreto, UUID usuario, Instant expira, String... roles) {
         return Jwts.builder()
-            .subject(UUID.randomUUID().toString())
+            .subject(usuario.toString())
             .claim("roles", List.of(roles))
             .issuer("flujos-api")
             .audience().add("flujos-clientes").and()

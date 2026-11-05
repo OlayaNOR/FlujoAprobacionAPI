@@ -5,10 +5,12 @@ import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.AccionNoPermitidaException;
 import com.nicolas.flujos.domain.solicitud.SolicitudNoEditableException;
+import com.nicolas.flujos.domain.solicitud.SolicitudNoEncontradaException;
 import com.nicolas.flujos.domain.solicitud.TransicionInvalidaException;
 import java.net.URI;
 import java.util.List;
 import org.slf4j.MDC;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +43,11 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     ProblemDetail accesoDenegado(AccessDeniedException ex) {
         return problema(HttpStatus.FORBIDDEN, "acceso-denegado", "Acceso denegado",
             "No tienes permisos para esta operación.");
+    }
+
+    @ExceptionHandler(SolicitudNoEncontradaException.class)
+    ProblemDetail noEncontrada(SolicitudNoEncontradaException ex) {
+        return problema(HttpStatus.NOT_FOUND, "no-encontrada", "Recurso no encontrado", "Solicitud no encontrada");
     }
 
     @ExceptionHandler(ReglaNegocioException.class)
@@ -103,6 +110,14 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
                                                                   WebRequest request) {
         var pd = problema(HttpStatus.BAD_REQUEST, "cuerpo-invalido", "Cuerpo de la petición inválido",
             "El cuerpo no es un JSON válido o tiene un valor con el tipo incorrecto.");
+        return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+                                                        HttpStatusCode status, WebRequest request) {
+        var pd = problema(HttpStatus.BAD_REQUEST, "parametro-invalido", "Parámetro inválido",
+            "El parámetro '%s' tiene un valor inválido.".formatted(ex.getPropertyName()));
         return handleExceptionInternal(ex, pd, headers, status, request);
     }
 

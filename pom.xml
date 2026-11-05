@@ -28,6 +28,7 @@
         <!-- 1.19.x, la que trae Boot 3.3, no funciona con Docker 29 -->
         <testcontainers.version>1.21.4</testcontainers.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
     </properties>
 
     <dependencyManagement>

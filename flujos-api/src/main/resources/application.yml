@@ -24,6 +24,9 @@ app:
       expiracion-refresh: P7D
       emisor: flujos-api
       audiencia: flujos-clientes
+  negocio:
+    moneda-base: USD
+    tiempo-limite-paso-horas: 48
 
 management:
   endpoints:
