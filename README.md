@@ -79,14 +79,41 @@ curl -X POST localhost:8080/api/v1/solicitudes \
   -d '{"tipo":"COMPRA","monto":{"valor":1250.50,"moneda":"USD"},"motivo":"Licencias"}'
 ```
 
+`POST /solicitudes` acepta el encabezado opcional `Idempotency-Key`. Repetir la petición con la misma clave y el mismo contenido devuelve la respuesta original sin crear otra solicitud, y usarla con otro contenido da 422. El detalle está en el [ADR-011](docs/adr/ADR-011-idempotencia-en-la-creacion.md).
+
+Los errores usan `application/problem+json`. El criterio entre 409 y 422 está en el [ADR-005](docs/adr/ADR-005-409-vs-422.md).
+
+## Flujos
+
+Cada tipo de solicitud tiene un flujo con sus pasos de aprobación, que un ADMIN puede cambiar sin desplegar.
+
 | Método | Ruta | Qué hace | Quién puede |
 |---|---|---|---|
 | GET | `/flujos/{tipo}` | Muestra los pasos configurados | Cualquier usuario autenticado |
 | PUT | `/flujos/{tipo}` | Reemplaza los pasos | ADMIN |
 
-`POST /solicitudes` acepta el encabezado opcional `Idempotency-Key`. Repetir la petición con la misma clave y el mismo contenido devuelve la respuesta original sin crear otra solicitud, y usarla con otro contenido da 422. El detalle está en el [ADR-011](docs/adr/ADR-011-idempotencia-en-la-creacion.md).
+```bash
+curl -X PUT localhost:8080/api/v1/flujos/COMPRA \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"pasos":[
+        {"rolAprobador":"JEFE","tiempoLimiteHoras":48},
+        {"rolAprobador":"GERENTE","umbralMinimo":5000,"tiempoLimiteHoras":24}
+      ]}'
+```
 
-Los errores usan `application/problem+json`. El criterio entre 409 y 422 está en el [ADR-005](docs/adr/ADR-005-409-vs-422.md).
+- El orden de los pasos es su posición en la lista.
+- `umbralMinimo` indica desde qué valor aplica el paso: un monto en compras y gastos, y días en vacaciones. Sin umbral, el paso aplica siempre.
+- Si ningún paso aplica, la solicitud se aprueba sola. Así funcionan los gastos menores a 200.
+- Una solicitud copia sus pasos al enviarse, así que un cambio solo afecta a las que se envíen después ([ADR-012](docs/adr/ADR-012-flujos-configurables.md)).
+
+Los flujos iniciales son:
+
+| Tipo | Pasos |
+|---|---|
+| `VACACIONES` | Jefe; RRHH desde 4 días |
+| `COMPRA` | Jefe; gerente desde 1.000; director desde 10.000,01 |
+| `GASTO` | Jefe desde 200 |
 
 ## Qué falta
 
