@@ -63,7 +63,10 @@ Todas las rutas van bajo `/api/v1` y exigen `Authorization: Bearer <accessToken>
 | GET | `/solicitudes/{id}` | Detalle | Solicitante, aprobador asignado, ADMIN |
 | PUT | `/solicitudes/{id}` | Edita un borrador | Solicitante |
 | POST | `/solicitudes/{id}/envio` | Envía a aprobación | Solicitante |
+| POST | `/solicitudes/{id}/decisiones` | Aprueba o rechaza el paso actual | Aprobador asignado |
 | POST | `/solicitudes/{id}/cancelacion` | Cancela | Solicitante |
+| POST | `/solicitudes/{id}/cierre` | Cierra una solicitud aprobada | ADMIN |
+| GET | `/solicitudes/{id}/auditoria` | Historial de transiciones | Quien puede ver la solicitud |
 
 Quien no puede ver una solicitud recibe 404 aunque exista ([ADR-006](docs/adr/ADR-006-404-para-recursos-ajenos.md)).
 
@@ -80,7 +83,6 @@ Los errores usan `application/problem+json`. El criterio entre 409 y 422 está e
 
 ## Qué falta
 
-- Aprobar y rechazar: una solicitud enviada todavía no puede avanzar más allá de `PENDIENTE`, salvo un gasto menor a 200 USD, que se aprueba solo.
-- Auditoría de transiciones, cierre e idempotencia en la creación.
+- Idempotencia en la creación.
 - Publicación de eventos con outbox: hoy el dominio los genera, pero no se guardan.
 - Job de escalamiento, rate limiting en el login, métricas y documentación OpenAPI.

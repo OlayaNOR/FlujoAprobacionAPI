@@ -9,6 +9,7 @@ import com.nicolas.flujos.api.dto.SolicitudResumenResponse;
 import com.nicolas.flujos.api.mapper.SolicitudMapper;
 import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.CancelarSolicitudUseCase;
+import com.nicolas.flujos.application.port.in.CerrarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarAuditoriaUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.CrearSolicitudUseCase;
@@ -56,13 +57,14 @@ class SolicitudController {
     private final EnviarSolicitudUseCase enviar;
     private final CancelarSolicitudUseCase cancelar;
     private final DecidirSolicitudUseCase decidir;
+    private final CerrarSolicitudUseCase cerrar;
     private final ConsultarAuditoriaUseCase consultarAuditoria;
     private final SolicitudMapper mapper;
 
     SolicitudController(CrearSolicitudUseCase crear, ConsultarSolicitudUseCase consultar,
                         EditarSolicitudUseCase editar, ListarSolicitudesUseCase listar,
                         EnviarSolicitudUseCase enviar, CancelarSolicitudUseCase cancelar,
-                        DecidirSolicitudUseCase decidir,
+                        DecidirSolicitudUseCase decidir, CerrarSolicitudUseCase cerrar,
                         ConsultarAuditoriaUseCase consultarAuditoria, SolicitudMapper mapper) {
         this.crear = crear;
         this.consultar = consultar;
@@ -71,6 +73,7 @@ class SolicitudController {
         this.enviar = enviar;
         this.cancelar = cancelar;
         this.decidir = decidir;
+        this.cerrar = cerrar;
         this.consultarAuditoria = consultarAuditoria;
         this.mapper = mapper;
     }
@@ -130,5 +133,11 @@ class SolicitudController {
     @PostMapping("/{id}/cancelacion")
     SolicitudResponse cancelar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
         return mapper.aResponse(cancelar.ejecutar(new SolicitudId(id), actor));
+    }
+
+    @PostMapping("/{id}/cierre")
+    @PreAuthorize("hasRole('ADMIN')")
+    SolicitudResponse cerrar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
+        return mapper.aResponse(cerrar.ejecutar(new SolicitudId(id), actor));
     }
 }
