@@ -1,5 +1,6 @@
 package com.nicolas.flujos.api.error;
 
+import com.nicolas.flujos.application.port.in.ClaveIdempotenciaReutilizadaException;
 import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
 import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
@@ -54,6 +55,12 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ParametroInvalidoException.class)
     ProblemDetail parametroInvalido(ParametroInvalidoException ex) {
         return problema(HttpStatus.BAD_REQUEST, "parametro-invalido", "Parámetro inválido", ex.getMessage());
+    }
+
+    @ExceptionHandler(ClaveIdempotenciaReutilizadaException.class)
+    ProblemDetail claveReutilizada(ClaveIdempotenciaReutilizadaException ex) {
+        return problema(HttpStatus.UNPROCESSABLE_ENTITY, "clave-idempotencia-reutilizada",
+            "Clave de idempotencia reutilizada", ex.getMessage());
     }
 
     @ExceptionHandler(ReglaNegocioException.class)

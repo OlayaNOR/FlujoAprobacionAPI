@@ -6,6 +6,7 @@ import com.nicolas.flujos.api.dto.EditarSolicitudRequest;
 import com.nicolas.flujos.api.dto.RegistroAuditoriaResponse;
 import com.nicolas.flujos.api.dto.SolicitudResponse;
 import com.nicolas.flujos.api.dto.SolicitudResumenResponse;
+import com.nicolas.flujos.api.error.ParametroInvalidoException;
 import com.nicolas.flujos.api.mapper.SolicitudMapper;
 import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.CancelarSolicitudUseCase;
@@ -40,6 +41,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 class SolicitudController {
 
     static final String RUTA = "/api/v1/solicitudes";
+    private static final int LARGO_MAXIMO_CLAVE = 100;
 
     private final CrearSolicitudUseCase crear;
     private final ConsultarSolicitudUseCase consultar;
@@ -81,8 +84,10 @@ class SolicitudController {
     @PostMapping
     @PreAuthorize("hasRole('EMPLEADO')")
     ResponseEntity<SolicitudResponse> crear(@AuthenticationPrincipal Actor actor,
+                                            @RequestHeader(name = "Idempotency-Key", required = false) String clave,
                                             @Valid @RequestBody CrearSolicitudRequest request) {
-        var creada = mapper.aResponse(crear.ejecutar(mapper.aComando(request, actor)));
+        validarClaveIdempotencia(clave);
+        var creada = mapper.aResponse(crear.ejecutar(mapper.aComando(request, actor), clave));
         return ResponseEntity.created(URI.create(RUTA + "/" + creada.id())).body(creada);
     }
 
@@ -139,5 +144,14 @@ class SolicitudController {
     @PreAuthorize("hasRole('ADMIN')")
     SolicitudResponse cerrar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
         return mapper.aResponse(cerrar.ejecutar(new SolicitudId(id), actor));
+    }
+
+    // Un @Size en el parámetro haría que Spring valide todo el método, y los errores del cuerpo
+    // dejarían de llegar con el formato de campo que usa el resto de la API.
+    private static void validarClaveIdempotencia(String clave) {
+        if (clave != null && (clave.isBlank() || clave.length() > LARGO_MAXIMO_CLAVE)) {
+            throw new ParametroInvalidoException(
+                "Idempotency-Key debe tener entre 1 y %d caracteres".formatted(LARGO_MAXIMO_CLAVE));
+        }
     }
 }

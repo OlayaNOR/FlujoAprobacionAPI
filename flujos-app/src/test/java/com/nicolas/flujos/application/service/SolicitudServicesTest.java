@@ -12,6 +12,7 @@ import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.CrearSolicitudCommand;
 import com.nicolas.flujos.application.port.in.EditarSolicitudCommand;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
+import com.nicolas.flujos.application.port.out.IdempotenciaRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
@@ -44,7 +45,7 @@ class SolicitudServicesTest {
     private final SolicitudRepository repositorio = mock(SolicitudRepository.class);
     private final AprobacionRepository aprobaciones = mock(AprobacionRepository.class);
     private final AccesoSolicitudes acceso = new AccesoSolicitudes(repositorio, aprobaciones);
-    private final CrearSolicitudService crear = new CrearSolicitudService(repositorio, RELOJ, USD);
+    private final CrearSolicitudService crear = new CrearSolicitudService(repositorio, mock(IdempotenciaRepository.class), RELOJ, USD);
     private final ConsultarSolicitudService consultar = new ConsultarSolicitudService(acceso);
     private final EditarSolicitudService editar = new EditarSolicitudService(acceso, repositorio, RELOJ, USD);
 
@@ -53,7 +54,7 @@ class SolicitudServicesTest {
 
     @Test
     void crearGuardaLaSolicitudEnBorrador() {
-        var detalle = crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.COMPRA, CIEN, null, "Licencias"));
+        var detalle = crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.COMPRA, CIEN, null, "Licencias"), null);
 
         verify(repositorio).guardar(any());
         assertThat(detalle.estado()).isEqualTo(EstadoSolicitud.BORRADOR);
@@ -64,7 +65,7 @@ class SolicitudServicesTest {
     void crearVacacionesUsaLaFechaDelReloj() {
         var pasado = new Periodo(HOY.minusDays(1), HOY);
 
-        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.VACACIONES, null, pasado, null)))
+        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.VACACIONES, null, pasado, null), null))
             .isInstanceOf(ReglaNegocioException.class);
     }
 
@@ -72,7 +73,7 @@ class SolicitudServicesTest {
     void unaCompraConPeriodoSeRechazaEnVezDeIgnorarlo() {
         var periodo = new Periodo(HOY, HOY);
 
-        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.COMPRA, CIEN, periodo, null)))
+        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.COMPRA, CIEN, periodo, null), null))
             .isInstanceOf(ReglaNegocioException.class);
         verify(repositorio, never()).guardar(any());
     }
@@ -81,7 +82,7 @@ class SolicitudServicesTest {
     void unasVacacionesConMontoSeRechazanEnVezDeIgnorarlo() {
         var periodo = new Periodo(HOY, HOY);
 
-        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.VACACIONES, CIEN, periodo, null)))
+        assertThatThrownBy(() -> crear.ejecutar(new CrearSolicitudCommand(dueno, TipoSolicitud.VACACIONES, CIEN, periodo, null), null))
             .isInstanceOf(ReglaNegocioException.class);
     }
 

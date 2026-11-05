@@ -79,10 +79,11 @@ curl -X POST localhost:8080/api/v1/solicitudes \
   -d '{"tipo":"COMPRA","monto":{"valor":1250.50,"moneda":"USD"},"motivo":"Licencias"}'
 ```
 
+`POST /solicitudes` acepta el encabezado opcional `Idempotency-Key`. Repetir la petición con la misma clave y el mismo contenido devuelve la respuesta original sin crear otra solicitud, y usarla con otro contenido da 422. El detalle está en el [ADR-011](docs/adr/ADR-011-idempotencia-en-la-creacion.md).
+
 Los errores usan `application/problem+json`. El criterio entre 409 y 422 está en el [ADR-005](docs/adr/ADR-005-409-vs-422.md).
 
 ## Qué falta
 
-- Idempotencia en la creación.
 - Publicación de eventos con outbox: hoy el dominio los genera, pero no se guardan.
 - Job de escalamiento, rate limiting en el login, métricas y documentación OpenAPI.

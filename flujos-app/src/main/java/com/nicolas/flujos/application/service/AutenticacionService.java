@@ -12,14 +12,10 @@ import com.nicolas.flujos.application.port.out.UsuarioRepository;
 import com.nicolas.flujos.application.port.out.VerificadorPassword;
 import com.nicolas.flujos.domain.usuario.Usuario;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,7 +65,7 @@ class AutenticacionService implements AutenticacionUseCase {
     @Override
     @Transactional(noRollbackFor = RefreshTokenInvalidoException.class)
     public TokensSesion renovar(String refreshToken) {
-        var token = refreshTokens.buscarConBloqueo(hash(refreshToken))
+        var token = refreshTokens.buscarConBloqueo(Sha256.de(refreshToken))
             .orElseThrow(RefreshTokenInvalidoException::new);
 
         if (token.revocado()) {
@@ -90,14 +86,14 @@ class AutenticacionService implements AutenticacionUseCase {
     @Override
     @Transactional
     public void cerrarSesion(UsuarioId actor, String refreshToken) {
-        refreshTokens.buscarConBloqueo(hash(refreshToken))
+        refreshTokens.buscarConBloqueo(Sha256.de(refreshToken))
             .filter(token -> token.usuarioId().equals(actor))
             .ifPresent(token -> refreshTokens.revocar(token.id()));
     }
 
     private TokensSesion abrirSesion(Usuario usuario) {
         var refreshToken = generarRefreshToken();
-        refreshTokens.guardar(new RefreshToken(UUID.randomUUID(), usuario.id(), hash(refreshToken),
+        refreshTokens.guardar(new RefreshToken(UUID.randomUUID(), usuario.id(), Sha256.de(refreshToken),
             clock.instant().plus(vigenciaRefresh), false));
         return new TokensSesion(emisor.emitir(usuario), refreshToken, emisor.vigencia());
     }
@@ -106,14 +102,5 @@ class AutenticacionService implements AutenticacionUseCase {
         var bytes = new byte[BYTES_REFRESH_TOKEN];
         ALEATORIO.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private static String hash(String token) {
-        try {
-            var digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }
