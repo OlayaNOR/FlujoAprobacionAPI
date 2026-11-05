@@ -17,6 +17,7 @@ services:
     depends_on:
       db: { condition: service_healthy }
     environment:
+      SPRING_PROFILES_ACTIVE: local
       DB_URL: jdbc:postgresql://db:5432/flujos
       DB_PASSWORD: ${DB_APP_PASSWORD}
       DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD}
