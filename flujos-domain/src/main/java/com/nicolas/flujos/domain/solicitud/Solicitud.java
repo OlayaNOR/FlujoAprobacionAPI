@@ -39,13 +39,30 @@ public final class Solicitud {
     private Instant actualizadaEn;
     private long version;
 
-    private Solicitud(UsuarioId solicitanteId, TipoSolicitud tipo, String motivo, Instant ahora) {
-        this.id = SolicitudId.nuevo();
+    private Solicitud(SolicitudId id, UsuarioId solicitanteId, TipoSolicitud tipo, String motivo, Instant creadaEn) {
+        this.id = Objects.requireNonNull(id);
         this.solicitanteId = Objects.requireNonNull(solicitanteId);
-        this.tipo = tipo;
+        this.tipo = Objects.requireNonNull(tipo);
         this.motivo = validarMotivo(motivo);
-        this.creadaEn = Objects.requireNonNull(ahora);
-        this.actualizadaEn = ahora;
+        this.creadaEn = Objects.requireNonNull(creadaEn);
+        this.actualizadaEn = creadaEn;
+    }
+
+    /** Para cargar desde persistencia: no valida fechas porque un periodo ya pasado sigue siendo correcto. */
+    public static Solicitud reconstituir(SolicitudId id, UsuarioId solicitanteId, TipoSolicitud tipo,
+                                         Money monto, Periodo periodo, String motivo, EstadoSolicitud estado,
+                                         int pasoActual, UsuarioId aprobadorActualId, Instant fechaLimitePaso,
+                                         long version, Instant creadaEn, Instant actualizadaEn) {
+        var solicitud = new Solicitud(id, solicitanteId, tipo, motivo, creadaEn);
+        solicitud.monto = monto;
+        solicitud.periodo = periodo;
+        solicitud.estado = Objects.requireNonNull(estado);
+        solicitud.pasoActual = pasoActual;
+        solicitud.aprobadorActualId = aprobadorActualId;
+        solicitud.fechaLimitePaso = fechaLimitePaso;
+        solicitud.version = version;
+        solicitud.actualizadaEn = actualizadaEn;
+        return solicitud;
     }
 
     public static Solicitud nuevaCompra(UsuarioId solicitanteId, Money monto, String motivo,
@@ -60,14 +77,14 @@ public final class Solicitud {
 
     public static Solicitud nuevasVacaciones(UsuarioId solicitanteId, Periodo periodo, String motivo,
                                              LocalDate hoy, Instant ahora) {
-        var solicitud = new Solicitud(solicitanteId, TipoSolicitud.VACACIONES, motivo, ahora);
+        var solicitud = new Solicitud(SolicitudId.nuevo(), solicitanteId, TipoSolicitud.VACACIONES, motivo, ahora);
         solicitud.periodo = validarPeriodo(periodo, hoy);
         return solicitud;
     }
 
     private static Solicitud conMonto(TipoSolicitud tipo, UsuarioId solicitanteId, Money monto, String motivo,
                                       Currency monedaBase, Instant ahora) {
-        var solicitud = new Solicitud(solicitanteId, tipo, motivo, ahora);
+        var solicitud = new Solicitud(SolicitudId.nuevo(), solicitanteId, tipo, motivo, ahora);
         solicitud.monto = validarMonto(monto, monedaBase);
         return solicitud;
     }

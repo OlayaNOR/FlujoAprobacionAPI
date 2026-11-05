@@ -373,6 +373,18 @@ class SolicitudTest {
     }
 
     @Test
+    void reconstituirAceptaUnPeriodoPasadoYPermiteContinuarElFlujo() {
+        var periodo = new Periodo(HOY.minusDays(30), HOY.minusDays(25));
+        var solicitud = Solicitud.reconstituir(SolicitudId.nuevo(), SOLICITANTE, TipoSolicitud.VACACIONES, null, periodo,
+            null, EstadoSolicitud.PENDIENTE, 1, Solicitudes.JEFE, AHORA, 3, AHORA, AHORA);
+
+        solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA);
+
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.APROBADA);
+        assertThat(solicitud.getVersion()).isEqualTo(3);
+    }
+
+    @Test
     void pullEventosVaciaLaLista() {
         var solicitud = Solicitudes.enBorrador();
         solicitud.enviar(UN_PASO, ASIGNADOR, AHORA);
