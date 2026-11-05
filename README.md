@@ -83,6 +83,10 @@ curl -X POST localhost:8080/api/v1/solicitudes \
 
 Los errores usan `application/problem+json`. El criterio entre 409 y 422 está en el [ADR-005](docs/adr/ADR-005-409-vs-422.md).
 
+## Escalamiento
+
+Cada 10 minutos un job revisa las solicitudes pendientes cuyo paso venció. Si hay un paso siguiente, la solicitud avanza a él; si era el último, se queda donde está y se publica un evento para avisar al ADMIN. Las dos cosas quedan en la auditoría (`ESCALADA` y `ESCALADA_ADMIN`). El detalle está en el [ADR-013](docs/adr/ADR-013-jobs-con-varias-instancias.md).
+
 ## Flujos
 
 Cada tipo de solicitud tiene un flujo con sus pasos de aprobación, que un ADMIN puede cambiar sin desplegar.
@@ -117,4 +121,4 @@ Los flujos iniciales son:
 
 ## Qué falta
 
-- Job de escalamiento, rate limiting en el login, métricas y documentación OpenAPI.
+- Rate limiting en el login, métricas y documentación OpenAPI.

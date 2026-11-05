@@ -9,7 +9,9 @@ import com.nicolas.flujos.domain.shared.Periodo;
 import com.nicolas.flujos.domain.solicitud.Solicitud;
 import com.nicolas.flujos.domain.solicitud.SolicitudId;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
+import java.time.Instant;
 import java.util.Currency;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
@@ -65,6 +67,17 @@ class SolicitudRepositoryAdapter implements SolicitudRepository {
             PageRequest.of(pagina.numero(), pagina.tamano(), orden(pagina)));
         return new Pagina<>(resultado.getContent().stream().map(SolicitudRepositoryAdapter::aDominio).toList(),
             resultado.getNumber(), resultado.getSize(), resultado.getTotalElements(), resultado.getTotalPages());
+    }
+
+    @Override
+    public List<SolicitudId> vencidas(Instant ahora, int lote) {
+        return jpa.idsVencidas(ahora, lote).stream().map(SolicitudId::new).toList();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Solicitud> tomarVencida(SolicitudId id, Instant ahora) {
+        return jpa.tomarVencida(id.valor(), ahora).map(SolicitudRepositoryAdapter::aDominio);
     }
 
     // El id desempata: sin él, filas con el mismo valor pueden repetirse o perderse entre páginas.
