@@ -50,6 +50,8 @@ curl -X POST localhost:8080/api/v1/auth/login \
   -d '{"email":"empleado@flujos.test","password":"demo-flujos-2026"}'
 ```
 
+El login acepta 5 intentos por minuto desde una misma IP, y después de 10 fallidos en una hora con el mismo email lo bloquea un rato. En los dos casos responde 429 con `Retry-After` ([ADR-008](docs/adr/ADR-008-rate-limiting-en-memoria.md)).
+
 El access token dura 15 minutos. Para renovarlo se envía el refresh token a `POST /api/v1/auth/refresh`, que entrega un par nuevo e invalida el anterior.
 
 ## Solicitudes
@@ -121,4 +123,4 @@ Los flujos iniciales son:
 
 ## Qué falta
 
-- Rate limiting en el login, métricas y documentación OpenAPI.
+- Métricas y documentación OpenAPI.

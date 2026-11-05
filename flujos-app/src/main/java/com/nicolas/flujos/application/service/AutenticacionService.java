@@ -2,10 +2,12 @@ package com.nicolas.flujos.application.service;
 
 import com.nicolas.flujos.application.port.in.AutenticacionUseCase;
 import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
+import com.nicolas.flujos.application.port.in.DemasiadosIntentosException;
 import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.application.port.in.TokensSesion;
 import com.nicolas.flujos.application.port.out.CuentaUsuario;
 import com.nicolas.flujos.application.port.out.EmisorAccessToken;
+import com.nicolas.flujos.application.port.out.IntentosLogin;
 import com.nicolas.flujos.application.port.out.RefreshToken;
 import com.nicolas.flujos.application.port.out.RefreshTokenRepository;
 import com.nicolas.flujos.application.port.out.UsuarioRepository;
@@ -31,16 +33,18 @@ class AutenticacionService implements AutenticacionUseCase {
     private final UsuarioRepository usuarios;
     private final RefreshTokenRepository refreshTokens;
     private final VerificadorPassword passwords;
+    private final IntentosLogin intentos;
     private final EmisorAccessToken emisor;
     private final Clock clock;
     private final Duration vigenciaRefresh;
 
     AutenticacionService(UsuarioRepository usuarios, RefreshTokenRepository refreshTokens,
-                         VerificadorPassword passwords, EmisorAccessToken emisor, Clock clock,
+                         VerificadorPassword passwords, IntentosLogin intentos, EmisorAccessToken emisor, Clock clock,
                          @Value("${app.seguridad.jwt.expiracion-refresh}") Duration vigenciaRefresh) {
         this.usuarios = usuarios;
         this.refreshTokens = refreshTokens;
         this.passwords = passwords;
+        this.intentos = intentos;
         this.emisor = emisor;
         this.clock = clock;
         this.vigenciaRefresh = vigenciaRefresh;
@@ -49,15 +53,22 @@ class AutenticacionService implements AutenticacionUseCase {
     // Sin @Transactional: BCrypt tarda y no vale la pena tener una conexión tomada mientras tanto.
     @Override
     public TokensSesion iniciarSesion(String email, String password) {
-        var cuenta = usuarios.buscarCuentaPorEmail(email.trim().toLowerCase(Locale.ROOT));
+        var normalizado = email.trim().toLowerCase(Locale.ROOT);
+        // Antes de BCrypt: un email bloqueado no debería costar un hash por intento.
+        intentos.bloqueo(normalizado).ifPresent(espera -> {
+            throw new DemasiadosIntentosException(espera);
+        });
+        var cuenta = usuarios.buscarCuentaPorEmail(normalizado);
 
         // Se verifica aunque el email no exista, para que el tiempo de respuesta no lo delate.
         var hash = cuenta.map(CuentaUsuario::passwordHash).orElse(null);
         var coincide = passwords.coincide(password, hash);
 
         if (cuenta.isEmpty() || !coincide || !cuenta.get().usuario().activo()) {
+            intentos.registrarFallo(normalizado);
             throw new CredencialesInvalidasException();
         }
+        intentos.limpiar(normalizado);
         return abrirSesion(cuenta.get().usuario());
     }
 

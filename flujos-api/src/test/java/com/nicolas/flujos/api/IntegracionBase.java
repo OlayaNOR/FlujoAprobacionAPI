@@ -2,9 +2,15 @@ package com.nicolas.flujos.api;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** Un solo contenedor para todas las pruebas: Testcontainers lo elimina al terminar la JVM. */
+// Todas las pruebas hacen login desde 127.0.0.1: con los límites reales se bloquearían entre sí.
+@TestPropertySource(properties = {
+    "app.seguridad.login.intentos-por-minuto-ip=100000",
+    "app.seguridad.login.fallos-por-hora-email=100000"
+})
 abstract class IntegracionBase {
 
     private static final String PASSWORD_APP = "clave-app-de-prueba";

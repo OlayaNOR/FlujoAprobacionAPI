@@ -2,6 +2,7 @@ package com.nicolas.flujos.api.error;
 
 import com.nicolas.flujos.application.port.in.ClaveIdempotenciaReutilizadaException;
 import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
+import com.nicolas.flujos.application.port.in.DemasiadosIntentosException;
 import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.domain.flujo.FlujoNoEncontradoException;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
@@ -38,6 +39,15 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
         var pd = problema(HttpStatus.UNAUTHORIZED, "credenciales-invalidas", "No autenticado", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+            .body(pd);
+    }
+
+    @ExceptionHandler(DemasiadosIntentosException.class)
+    ResponseEntity<ProblemDetail> demasiadosIntentos(DemasiadosIntentosException ex) {
+        var pd = problema(HttpStatus.TOO_MANY_REQUESTS, "demasiados-intentos", "Demasiados intentos", ex.getMessage());
+        var segundos = Math.max(1, (ex.getReintentarEn().toMillis() + 999) / 1000);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header("Retry-After", Long.toString(segundos))
             .body(pd);
     }
 

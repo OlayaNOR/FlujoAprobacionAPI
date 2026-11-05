@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -38,6 +39,17 @@ class RespuestaProblema implements AuthenticationEntryPoint, AccessDeniedHandler
         throws IOException {
         escribir(request, response, HttpStatus.FORBIDDEN, "acceso-denegado", "Acceso denegado",
             "No tienes permisos para esta operación.");
+    }
+
+    void demasiadosIntentos(HttpServletRequest request, HttpServletResponse response, Duration espera, String detalle)
+        throws IOException {
+        response.setHeader("Retry-After", Long.toString(segundos(espera)));
+        escribir(request, response, HttpStatus.TOO_MANY_REQUESTS, "demasiados-intentos", "Demasiados intentos", detalle);
+    }
+
+    /** Retry-After va en segundos enteros: se redondea hacia arriba para que el cliente no llegue antes de tiempo. */
+    static long segundos(Duration espera) {
+        return Math.max(1, (espera.toMillis() + 999) / 1000);
     }
 
     private void escribir(HttpServletRequest request, HttpServletResponse response, HttpStatus status,

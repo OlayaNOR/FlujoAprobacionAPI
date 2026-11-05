@@ -13,11 +13,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, LimiteLoginProperties.class})
 class SeguridadConfig {
 
     @Bean
-    SecurityFilterChain cadena(HttpSecurity http, ServicioJwt jwt, RespuestaProblema problemas) throws Exception {
+    SecurityFilterChain cadena(HttpSecurity http, ServicioJwt jwt, RespuestaProblema problemas,
+                               LimiteLoginProperties limites) throws Exception {
         return http
             .csrf(AbstractHttpConfigurer::disable) // bearer sin cookies, no hay sesión que falsificar
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -25,6 +26,8 @@ class SeguridadConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                 .anyRequest().authenticated())
+            .addFilterBefore(new FiltroLimiteLogin(limites.intentosPorMinutoIp(), problemas),
+                UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new FiltroJwt(jwt), UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(problemas)

@@ -12,9 +12,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
+import com.nicolas.flujos.application.port.in.DemasiadosIntentosException;
 import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.application.port.out.CuentaUsuario;
 import com.nicolas.flujos.application.port.out.EmisorAccessToken;
+import com.nicolas.flujos.application.port.out.IntentosLogin;
 import com.nicolas.flujos.application.port.out.RefreshToken;
 import com.nicolas.flujos.application.port.out.RefreshTokenRepository;
 import com.nicolas.flujos.application.port.out.UsuarioRepository;
@@ -42,9 +44,10 @@ class AutenticacionServiceTest {
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final RefreshTokenRepository refreshTokens = mock(RefreshTokenRepository.class);
     private final VerificadorPassword passwords = mock(VerificadorPassword.class);
+    private final IntentosLogin intentos = mock(IntentosLogin.class);
     private final EmisorAccessToken emisor = mock(EmisorAccessToken.class);
 
-    private final AutenticacionService servicio = new AutenticacionService(usuarios, refreshTokens, passwords, emisor,
+    private final AutenticacionService servicio = new AutenticacionService(usuarios, refreshTokens, passwords, intentos, emisor,
         Clock.fixed(AHORA, ZoneOffset.UTC), SIETE_DIAS);
 
     private final UsuarioId idAna = UsuarioId.nuevo();
@@ -68,6 +71,30 @@ class AutenticacionServiceTest {
         assertThat(sesion.accessToken()).isEqualTo("jwt");
         assertThat(guardado.getValue().tokenHash()).hasSize(64).isNotEqualTo(sesion.refreshToken());
         assertThat(guardado.getValue().expiraEn()).isEqualTo(AHORA.plus(SIETE_DIAS));
+    }
+
+    @Test
+    void unEmailBloqueadoNoLlegaAVerificarLaClave() {
+        when(intentos.bloqueo(EMAIL)).thenReturn(Optional.of(Duration.ofMinutes(6)));
+
+        assertThatThrownBy(() -> servicio.iniciarSesion(" Ana@Flujos.test ", "clave"))
+            .isInstanceOf(DemasiadosIntentosException.class)
+            .extracting(e -> ((DemasiadosIntentosException) e).getReintentarEn())
+            .isEqualTo(Duration.ofMinutes(6));
+
+        verify(passwords, never()).coincide(anyString(), any());
+    }
+
+    @Test
+    void unaClaveIncorrectaCuentaComoFalloYUnaCorrectaLimpiaLosFallos() {
+        registrarCuenta(ana);
+        when(passwords.coincide("clave", "hash-bcrypt")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.iniciarSesion(EMAIL, "otra")).isInstanceOf(CredencialesInvalidasException.class);
+        verify(intentos).registrarFallo(EMAIL);
+
+        servicio.iniciarSesion(EMAIL, "clave");
+        verify(intentos).limpiar(EMAIL);
     }
 
     @Test
