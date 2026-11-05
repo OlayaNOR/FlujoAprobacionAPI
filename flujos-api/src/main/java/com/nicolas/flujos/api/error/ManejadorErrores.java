@@ -1,5 +1,7 @@
 package com.nicolas.flujos.api.error;
 
+import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
+import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.AccionNoPermitidaException;
 import com.nicolas.flujos.domain.solicitud.SolicitudNoEditableException;
@@ -14,6 +16,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -24,6 +27,21 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class ManejadorErrores extends ResponseEntityExceptionHandler {
 
     private static final String BASE_TIPO = "https://flujos.api/errores/";
+
+    @ExceptionHandler({CredencialesInvalidasException.class, RefreshTokenInvalidoException.class})
+    ResponseEntity<ProblemDetail> noAutenticado(RuntimeException ex) {
+        var pd = problema(HttpStatus.UNAUTHORIZED, "credenciales-invalidas", "No autenticado", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+            .body(pd);
+    }
+
+    // @PreAuthorize lanza dentro del controlador: sin este handler caería en el de Exception y sería un 500.
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail accesoDenegado(AccessDeniedException ex) {
+        return problema(HttpStatus.FORBIDDEN, "acceso-denegado", "Acceso denegado",
+            "No tienes permisos para esta operación.");
+    }
 
     @ExceptionHandler(ReglaNegocioException.class)
     ProblemDetail reglaNegocio(ReglaNegocioException ex) {

@@ -20,6 +20,7 @@ services:
       DB_URL: jdbc:postgresql://db:5432/flujos
       DB_PASSWORD: ${DB_APP_PASSWORD}
       DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     ports: ["8080:8080"]
 
 volumes:

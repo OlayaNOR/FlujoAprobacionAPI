@@ -16,6 +16,15 @@ spring:
     placeholders:
       appPassword: ${DB_PASSWORD}
 
+app:
+  seguridad:
+    jwt:
+      secreto: ${JWT_SECRET}
+      expiracion-access: PT15M
+      expiracion-refresh: P7D
+      emisor: flujos-api
+      audiencia: flujos-clientes
+
 management:
   endpoints:
     web:
