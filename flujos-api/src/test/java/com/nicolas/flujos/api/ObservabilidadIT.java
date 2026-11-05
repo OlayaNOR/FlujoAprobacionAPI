@@ -12,12 +12,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-// Sin esta anotación, las pruebas de Spring Boot apagan el tracing y no habría traceId.
-@AutoConfigureObservability
 class ObservabilidadIT extends PruebaApi {
 
     private static final String COMPRA_PEQUENA = "{\"tipo\":\"COMPRA\",\"monto\":{\"valor\":500,\"moneda\":\"USD\"}}";
