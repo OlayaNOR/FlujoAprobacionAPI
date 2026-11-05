@@ -1,5 +1,7 @@
 # ADR-007: Umbrales de aprobación en código para la v1
 
+**Reemplazado por el [ADR-012](ADR-012-flujos-configurables.md).**
+
 ## Contexto
 
 Los umbrales (1.000 y 10.000 USD en compras, 200 USD en gastos, 3 días en vacaciones) podrían vivir en la tabla `paso_aprobacion`, que ya tiene `umbral_minimo`, o en las clases de regla.

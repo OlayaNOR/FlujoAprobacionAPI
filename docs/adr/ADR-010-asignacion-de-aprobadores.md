@@ -2,7 +2,7 @@
 
 ## Contexto
 
-Las reglas piden pasos de `JEFE`, `RRHH`, `GERENTE` y `DIRECTOR`, pero los roles de seguridad solo son `EMPLEADO`, `APROBADOR` y `ADMIN`. Hacía falta saber quién aprueba cada paso. Asignar solo por cargo mandaría solicitudes a jefes de otros equipos.
+Los flujos piden pasos de `JEFE`, `RRHH`, `GERENTE` y `DIRECTOR`, pero los roles de seguridad solo son `EMPLEADO`, `APROBADOR` y `ADMIN`. Hacía falta saber quién aprueba cada paso. Asignar solo por cargo mandaría solicitudes a jefes de otros equipos.
 
 ## Decisión
 

@@ -8,7 +8,7 @@ Proyecto en desarrollo. Ver [qué falta](#qué-falta).
 
 | Módulo | Contenido | Depende de |
 |---|---|---|
-| `flujos-domain` | Agregados, value objects y reglas. Sin frameworks. | - |
+| `flujos-domain` | Agregados y value objects. Sin frameworks. | - |
 | `flujos-app` | Casos de uso y puertos. | domain |
 | `flujos-infra` | JPA, seguridad, jobs. | app |
 | `flujos-api` | Controladores y arranque de la aplicación. | app (infra solo en runtime) |
@@ -78,6 +78,11 @@ curl -X POST localhost:8080/api/v1/solicitudes \
   -H 'Content-Type: application/json' \
   -d '{"tipo":"COMPRA","monto":{"valor":1250.50,"moneda":"USD"},"motivo":"Licencias"}'
 ```
+
+| Método | Ruta | Qué hace | Quién puede |
+|---|---|---|---|
+| GET | `/flujos/{tipo}` | Muestra los pasos configurados | Cualquier usuario autenticado |
+| PUT | `/flujos/{tipo}` | Reemplaza los pasos | ADMIN |
 
 `POST /solicitudes` acepta el encabezado opcional `Idempotency-Key`. Repetir la petición con la misma clave y el mismo contenido devuelve la respuesta original sin crear otra solicitud, y usarla con otro contenido da 422. El detalle está en el [ADR-011](docs/adr/ADR-011-idempotencia-en-la-creacion.md).
 

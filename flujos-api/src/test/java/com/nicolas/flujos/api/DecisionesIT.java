@@ -14,7 +14,6 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.ResultActions;
 
 class DecisionesIT extends PruebaApi {
 
@@ -209,27 +208,5 @@ class DecisionesIT extends PruebaApi {
         decidir(id, jefe, "{}").andExpect(status().isBadRequest());
         decidir(id, jefe, "{\"tipo\":\"APROBAR\",\"comentario\":\"%s\"}".formatted("x".repeat(501)))
             .andExpect(status().isBadRequest());
-    }
-
-    private String enviada(UUID solicitante, String cuerpo) throws Exception {
-        var id = idDe(crear(solicitante, cuerpo));
-        accion(id, "envio", solicitante, "EMPLEADO").andExpect(status().isOk());
-        return id;
-    }
-
-    private ResultActions decidir(String id, UUID aprobador, String cuerpo) throws Exception {
-        return mvc.perform(post(RUTA + "/" + id + "/decisiones")
-            .header(HttpHeaders.AUTHORIZATION, bearer(aprobador, "APROBADOR"))
-            .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
-    }
-
-    private UUID siguienteAprobador(ResultActions resultado) throws Exception {
-        var cuerpo = mapper.readTree(resultado.andReturn().getResponse().getContentAsString());
-        return UUID.fromString(cuerpo.get("aprobadorActualId").asText());
-    }
-
-    private void crearConCargo(String cargo) {
-        var id = crearAprobador();
-        jdbc.update("UPDATE usuario SET cargo = ? WHERE id = ?", cargo, id);
     }
 }

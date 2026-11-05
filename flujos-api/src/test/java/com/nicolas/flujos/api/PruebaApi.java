@@ -3,6 +3,7 @@ package com.nicolas.flujos.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
@@ -55,6 +56,23 @@ abstract class PruebaApi extends IntegracionBase {
         return mvc.perform(get(RUTA + "/" + id + "/auditoria").header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
     }
 
+    String enviada(UUID solicitante, String cuerpo) throws Exception {
+        var id = idDe(crear(solicitante, cuerpo));
+        accion(id, "envio", solicitante, "EMPLEADO").andExpect(status().isOk());
+        return id;
+    }
+
+    ResultActions decidir(String id, UUID aprobador, String cuerpo) throws Exception {
+        return mvc.perform(post(RUTA + "/" + id + "/decisiones")
+            .header(HttpHeaders.AUTHORIZATION, bearer(aprobador, "APROBADOR"))
+            .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
+    }
+
+    UUID siguienteAprobador(ResultActions resultado) throws Exception {
+        var cuerpo = mapper.readTree(resultado.andReturn().getResponse().getContentAsString());
+        return UUID.fromString(cuerpo.get("aprobadorActualId").asText());
+    }
+
     String idDe(ResultActions resultado) throws Exception {
         return mapper.readTree(resultado.andReturn().getResponse().getContentAsString()).get("id").asText();
     }
@@ -69,6 +87,12 @@ abstract class PruebaApi extends IntegracionBase {
     UUID crearAprobador() {
         var id = crearUsuario();
         jdbc.update("INSERT INTO usuario_rol (usuario_id, rol) VALUES (?, 'APROBADOR')", id);
+        return id;
+    }
+
+    UUID crearConCargo(String cargo) {
+        var id = crearAprobador();
+        jdbc.update("UPDATE usuario SET cargo = ? WHERE id = ?", cargo, id);
         return id;
     }
 

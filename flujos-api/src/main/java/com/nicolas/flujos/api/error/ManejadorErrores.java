@@ -3,6 +3,7 @@ package com.nicolas.flujos.api.error;
 import com.nicolas.flujos.application.port.in.ClaveIdempotenciaReutilizadaException;
 import com.nicolas.flujos.application.port.in.CredencialesInvalidasException;
 import com.nicolas.flujos.application.port.in.RefreshTokenInvalidoException;
+import com.nicolas.flujos.domain.flujo.FlujoNoEncontradoException;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.AccionNoPermitidaException;
 import com.nicolas.flujos.domain.solicitud.SolicitudNoEditableException;
@@ -50,6 +51,11 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     @ExceptionHandler(SolicitudNoEncontradaException.class)
     ProblemDetail noEncontrada(SolicitudNoEncontradaException ex) {
         return problema(HttpStatus.NOT_FOUND, "no-encontrada", "Recurso no encontrado", "Solicitud no encontrada");
+    }
+
+    @ExceptionHandler(FlujoNoEncontradoException.class)
+    ProblemDetail flujoNoEncontrado(FlujoNoEncontradoException ex) {
+        return problema(HttpStatus.NOT_FOUND, "no-encontrada", "Recurso no encontrado", ex.getMessage());
     }
 
     @ExceptionHandler(ParametroInvalidoException.class)
