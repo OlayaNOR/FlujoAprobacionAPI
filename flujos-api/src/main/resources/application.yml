@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: flujos-aprobacion
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
