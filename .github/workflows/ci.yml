@@ -19,14 +19,14 @@ jobs:
       - run: ./mvnw -B verify
       - name: Reporte de cobertura
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cobertura
           path: "*/target/site/jacoco/"
           if-no-files-found: ignore
       - name: Reportes de pruebas
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: reportes-de-pruebas
           path: |
