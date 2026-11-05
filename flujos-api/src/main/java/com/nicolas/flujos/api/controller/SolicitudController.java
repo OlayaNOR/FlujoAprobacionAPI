@@ -1,6 +1,7 @@
 package com.nicolas.flujos.api.controller;
 
 import com.nicolas.flujos.api.dto.CrearSolicitudRequest;
+import com.nicolas.flujos.api.dto.DecisionRequest;
 import com.nicolas.flujos.api.dto.EditarSolicitudRequest;
 import com.nicolas.flujos.api.dto.RegistroAuditoriaResponse;
 import com.nicolas.flujos.api.dto.SolicitudResponse;
@@ -11,6 +12,8 @@ import com.nicolas.flujos.application.port.in.CancelarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarAuditoriaUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.CrearSolicitudUseCase;
+import com.nicolas.flujos.application.port.in.DecidirSolicitudCommand;
+import com.nicolas.flujos.application.port.in.DecidirSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.EditarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.EnviarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.FiltroSolicitud;
@@ -52,12 +55,14 @@ class SolicitudController {
     private final ListarSolicitudesUseCase listar;
     private final EnviarSolicitudUseCase enviar;
     private final CancelarSolicitudUseCase cancelar;
+    private final DecidirSolicitudUseCase decidir;
     private final ConsultarAuditoriaUseCase consultarAuditoria;
     private final SolicitudMapper mapper;
 
     SolicitudController(CrearSolicitudUseCase crear, ConsultarSolicitudUseCase consultar,
                         EditarSolicitudUseCase editar, ListarSolicitudesUseCase listar,
                         EnviarSolicitudUseCase enviar, CancelarSolicitudUseCase cancelar,
+                        DecidirSolicitudUseCase decidir,
                         ConsultarAuditoriaUseCase consultarAuditoria, SolicitudMapper mapper) {
         this.crear = crear;
         this.consultar = consultar;
@@ -65,6 +70,7 @@ class SolicitudController {
         this.listar = listar;
         this.enviar = enviar;
         this.cancelar = cancelar;
+        this.decidir = decidir;
         this.consultarAuditoria = consultarAuditoria;
         this.mapper = mapper;
     }
@@ -111,6 +117,14 @@ class SolicitudController {
     @PostMapping("/{id}/envio")
     SolicitudResponse enviar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
         return mapper.aResponse(enviar.ejecutar(new SolicitudId(id), actor));
+    }
+
+    @PostMapping("/{id}/decisiones")
+    @PreAuthorize("hasRole('APROBADOR')")
+    SolicitudResponse decidir(@AuthenticationPrincipal Actor actor, @PathVariable UUID id,
+                              @Valid @RequestBody DecisionRequest request) {
+        return mapper.aResponse(decidir.ejecutar(
+            new DecidirSolicitudCommand(new SolicitudId(id), actor, request.tipo(), request.comentario())));
     }
 
     @PostMapping("/{id}/cancelacion")

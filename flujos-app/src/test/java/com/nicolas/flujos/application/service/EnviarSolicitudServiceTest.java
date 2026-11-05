@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nicolas.flujos.application.port.in.Actor;
+import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
@@ -44,7 +45,7 @@ class EnviarSolicitudServiceTest {
     private final UsuarioId jefe = UsuarioId.nuevo();
 
     private final EnviarSolicitudService servicio = new EnviarSolicitudService(
-        new AccesoSolicitudes(solicitudes),
+        new AccesoSolicitudes(solicitudes, mock(AprobacionRepository.class)),
         solicitudes,
         new ReglasAprobacionRegistry(List.of(new ReglaCompra(LIMITE), new ReglaGasto(LIMITE))),
         (rol, solicitante) -> jefe,

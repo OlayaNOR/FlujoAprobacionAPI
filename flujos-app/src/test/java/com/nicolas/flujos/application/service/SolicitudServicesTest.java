@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.CrearSolicitudCommand;
 import com.nicolas.flujos.application.port.in.EditarSolicitudCommand;
+import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
@@ -41,7 +42,8 @@ class SolicitudServicesTest {
     private static final Money CIEN = Money.de("100", "USD");
 
     private final SolicitudRepository repositorio = mock(SolicitudRepository.class);
-    private final AccesoSolicitudes acceso = new AccesoSolicitudes(repositorio);
+    private final AprobacionRepository aprobaciones = mock(AprobacionRepository.class);
+    private final AccesoSolicitudes acceso = new AccesoSolicitudes(repositorio, aprobaciones);
     private final CrearSolicitudService crear = new CrearSolicitudService(repositorio, RELOJ, USD);
     private final ConsultarSolicitudService consultar = new ConsultarSolicitudService(acceso);
     private final EditarSolicitudService editar = new EditarSolicitudService(acceso, repositorio, RELOJ, USD);
@@ -98,6 +100,15 @@ class SolicitudServicesTest {
 
         assertThatThrownBy(() -> consultar.ejecutar(solicitud.getId(), actor(UsuarioId.nuevo(), Rol.EMPLEADO)))
             .isInstanceOf(SolicitudNoEncontradaException.class);
+    }
+
+    @Test
+    void quienYaDecidioUnPasoSigueViendoLaSolicitud() {
+        var solicitud = pendiente();
+        var jefeAnterior = UsuarioId.nuevo();
+        when(aprobaciones.participo(solicitud.getId(), jefeAnterior)).thenReturn(true);
+
+        assertThat(consultar.ejecutar(solicitud.getId(), actor(jefeAnterior, Rol.APROBADOR)).id()).isEqualTo(solicitud.getId());
     }
 
     @Test

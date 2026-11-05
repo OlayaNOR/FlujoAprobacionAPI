@@ -47,7 +47,9 @@ class SolicitudRepositoryAdapter implements SolicitudRepository {
         entidad.fechaLimitePaso = s.getFechaLimitePaso();
         entidad.creadaEn = s.getCreadaEn();
         entidad.actualizadaEn = s.getActualizadaEn();
-        jpa.save(entidad);
+        // Hibernate hace los INSERT antes que los UPDATE al confirmar. Con flush aquí, un conflicto de versión
+        // aparece antes de escribir la decisión o la auditoría, y no como una violación de clave única.
+        jpa.saveAndFlush(entidad);
     }
 
     @Override
