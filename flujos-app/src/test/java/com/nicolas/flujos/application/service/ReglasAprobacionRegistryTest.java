@@ -3,6 +3,7 @@ package com.nicolas.flujos.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nicolas.flujos.domain.regla.ReglaAprobacion;
 import com.nicolas.flujos.domain.regla.ReglaCompra;
 import com.nicolas.flujos.domain.regla.ReglaGasto;
 import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
@@ -31,7 +32,7 @@ class ReglasAprobacionRegistryTest {
 
     @Test
     void dosReglasParaElMismoTipoImpidenArrancar() {
-        var repetidas = List.of(new ReglaCompra(LIMITE), new ReglaCompra(LIMITE));
+        List<ReglaAprobacion> repetidas = List.of(new ReglaCompra(LIMITE), new ReglaCompra(LIMITE));
 
         assertThatThrownBy(() -> new ReglasAprobacionRegistry(repetidas))
             .isInstanceOf(IllegalStateException.class);
