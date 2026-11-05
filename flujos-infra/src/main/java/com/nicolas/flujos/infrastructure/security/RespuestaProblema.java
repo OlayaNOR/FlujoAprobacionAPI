@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -58,6 +59,10 @@ class RespuestaProblema implements AuthenticationEntryPoint, AccessDeniedHandler
         pd.setType(URI.create("https://flujos.api/errores/" + tipo));
         pd.setTitle(titulo);
         pd.setInstance(URI.create(request.getRequestURI()));
+        var traceId = MDC.get("traceId");
+        if (traceId != null) {
+            pd.setProperty("traceId", traceId);
+        }
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getOutputStream().write(mapper.writeValueAsBytes(pd));

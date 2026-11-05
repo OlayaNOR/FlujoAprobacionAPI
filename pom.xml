@@ -30,6 +30,7 @@
         <jjwt.version>0.12.6</jjwt.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <bucket4j.version>8.10.1</bucket4j.version>
+        <logstash-encoder.version>8.0</logstash-encoder.version>
     </properties>
 
     <dependencyManagement>

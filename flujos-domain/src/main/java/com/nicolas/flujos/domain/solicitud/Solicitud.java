@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class Solicitud {
 
@@ -189,6 +190,17 @@ public final class Solicitud {
         return estado == EstadoSolicitud.PENDIENTE
             && fechaLimitePaso != null
             && fechaLimitePaso.isBefore(ahora);
+    }
+
+    /**
+     * Cuándo le llegó el paso actual a su aprobador. Se deduce de la fecha límite, así que queda vacío
+     * después de avisar al ADMIN, cuando esa fecha se borra.
+     */
+    public Optional<Instant> inicioPasoActual() {
+        if (estado != EstadoSolicitud.PENDIENTE || fechaLimitePaso == null) {
+            return Optional.empty();
+        }
+        return Optional.of(fechaLimitePaso.minus(Duration.ofHours(pasos.get(pasoActual - 1).tiempoLimiteHoras())));
     }
 
     public boolean esAprobadorDelPasoActual(UsuarioId usuario) {

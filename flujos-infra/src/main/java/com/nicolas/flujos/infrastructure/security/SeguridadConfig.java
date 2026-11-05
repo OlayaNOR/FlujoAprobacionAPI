@@ -25,6 +25,7 @@ class SeguridadConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(new FiltroLimiteLogin(limites.intentosPorMinutoIp(), problemas),
                 UsernamePasswordAuthenticationFilter.class)

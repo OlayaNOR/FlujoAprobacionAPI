@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -72,7 +73,8 @@ class AutenticacionIT extends IntegracionBase {
             .andExpect(status().isUnauthorized())
             .andReturn().getResponse().getContentAsString();
 
-        assertThat(mala).isEqualTo(inexistente);
+        // el traceId es de cada petición; todo lo demás tiene que ser idéntico
+        assertThat(sinTraceId(mala)).isEqualTo(sinTraceId(inexistente));
     }
 
     @Test
@@ -235,6 +237,12 @@ class AutenticacionIT extends IntegracionBase {
         jdbc.update("INSERT INTO usuario (id, email, nombre, password_hash) VALUES (?, ?, 'Prueba', ?)", id, email, HASH);
         jdbc.update("INSERT INTO usuario_rol (usuario_id, rol) VALUES (?, ?)", id, rol);
         return email;
+    }
+
+    private JsonNode sinTraceId(String cuerpo) throws Exception {
+        var json = (ObjectNode) mapper.readTree(cuerpo);
+        json.remove("traceId");
+        return json;
     }
 
     private ResultActions login(String email, String password) throws Exception {

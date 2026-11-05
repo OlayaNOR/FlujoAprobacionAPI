@@ -5,6 +5,7 @@ import com.nicolas.flujos.application.port.in.CrearSolicitudCommand;
 import com.nicolas.flujos.application.port.in.CrearSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.SolicitudDetalle;
 import com.nicolas.flujos.application.port.out.IdempotenciaRepository;
+import com.nicolas.flujos.application.port.out.MetricasSolicitudes;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.solicitud.Solicitud;
 import java.time.Clock;
@@ -20,13 +21,16 @@ class CrearSolicitudService implements CrearSolicitudUseCase {
 
     private final SolicitudRepository solicitudes;
     private final IdempotenciaRepository idempotencia;
+    private final MetricasSolicitudes metricas;
     private final Clock clock;
     private final Currency monedaBase;
 
-    CrearSolicitudService(SolicitudRepository solicitudes, IdempotenciaRepository idempotencia, Clock clock,
+    CrearSolicitudService(SolicitudRepository solicitudes, IdempotenciaRepository idempotencia,
+                          MetricasSolicitudes metricas, Clock clock,
                           @Value("${app.negocio.moneda-base}") Currency monedaBase) {
         this.solicitudes = solicitudes;
         this.idempotencia = idempotencia;
+        this.metricas = metricas;
         this.clock = clock;
         this.monedaBase = monedaBase;
     }
@@ -61,6 +65,7 @@ class CrearSolicitudService implements CrearSolicitudUseCase {
                 LocalDate.now(clock), ahora);
         };
         solicitudes.guardar(solicitud);
+        metricas.solicitudCreada(solicitud.getTipo());
         return SolicitudDetalle.de(solicitud);
     }
 

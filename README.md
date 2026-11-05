@@ -121,6 +121,12 @@ Los flujos iniciales son:
 | `COMPRA` | Jefe; gerente desde 1.000; director desde 10.000,01 |
 | `GASTO` | Jefe desde 200 |
 
+## Observabilidad
+
+- `/actuator/health` es público. `/actuator/metrics` y `/actuator/info` exigen el rol ADMIN.
+- Métricas propias: `solicitudes.creadas` (por tipo), `solicitudes.por_estado` (gauge, se actualiza cada minuto) y `aprobaciones.tiempo_respuesta` (timer por tipo y resultado, desde que el paso le llega al aprobador hasta que decide). Se registran al confirmar la transacción.
+- Los logs salen en JSON salvo en el perfil `local`, e incluyen `traceId` y `spanId`. El mismo `traceId` aparece en las respuestas de error, para encontrar el log de una petición que falló.
+
 ## Qué falta
 
-- Métricas y documentación OpenAPI.
+- Documentación OpenAPI, pruebas de arquitectura con ArchUnit, CI con cobertura y colección de Bruno (fase 4).

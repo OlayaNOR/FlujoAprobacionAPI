@@ -13,6 +13,7 @@ import com.nicolas.flujos.application.port.in.DecidirSolicitudCommand;
 import com.nicolas.flujos.application.port.in.TipoDecision;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
+import com.nicolas.flujos.application.port.out.MetricasSolicitudes;
 import com.nicolas.flujos.application.port.out.OutboxRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
@@ -32,6 +33,7 @@ import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
 import com.nicolas.flujos.domain.usuario.Rol;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -48,12 +50,13 @@ class DecidirSolicitudServiceTest {
     private final AprobacionRepository aprobaciones = mock(AprobacionRepository.class);
     private final AuditoriaRepository auditoria = mock(AuditoriaRepository.class);
     private final OutboxRepository outbox = mock(OutboxRepository.class);
+    private final MetricasSolicitudes metricas = mock(MetricasSolicitudes.class);
     private final UsuarioId dueno = UsuarioId.nuevo();
     private final UsuarioId jefe = UsuarioId.nuevo();
     private final UsuarioId gerente = UsuarioId.nuevo();
 
     private final DecidirSolicitudService servicio = new DecidirSolicitudService(
-        new AccesoSolicitudes(solicitudes, aprobaciones), solicitudes, aprobaciones, auditoria, outbox,
+        new AccesoSolicitudes(solicitudes, aprobaciones), solicitudes, aprobaciones, auditoria, outbox, metricas,
         (rol, solicitante) -> gerente, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
@@ -73,6 +76,8 @@ class DecidirSolicitudServiceTest {
         assertThat(registro.accion()).isEqualTo(AccionAuditoria.APROBADA);
         assertThat(registro.estadoNuevo()).isEqualTo(EstadoSolicitud.PENDIENTE);
         assertThat(registro.detalle()).containsEntry("paso", 1).containsEntry("comentario", "Visto bueno");
+        // el paso vence en AHORA y dura 48 horas: le llegó al jefe 48 horas antes
+        verify(metricas).decisionTomada(TipoSolicitud.COMPRA, ResultadoDecision.APROBADA, Duration.ofHours(48));
     }
 
     @Test
@@ -97,6 +102,7 @@ class DecidirSolicitudServiceTest {
         verify(solicitudes, never()).guardar(any());
         verify(aprobaciones, never()).registrar(any());
         verify(outbox, never()).encolar(any());
+        verify(metricas, never()).decisionTomada(any(), any(), any());
     }
 
     @Test

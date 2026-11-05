@@ -439,6 +439,19 @@ class SolicitudTest {
         }
 
         @Test
+        void elInicioDelPasoSeDeduceDeSuFechaLimite() {
+            var flujo = Solicitudes.flujoCon(List.of(
+                new PasoAprobacion(1, JEFE, null, 24), new PasoAprobacion(2, GERENTE, null, 72)));
+            var solicitud = Solicitudes.pendiente(flujo);
+            var despues = AHORA.plus(Duration.ofHours(5));
+
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, despues);
+
+            assertThat(solicitud.inicioPasoActual()).contains(despues);
+            assertThat(Solicitudes.enBorrador().inicioPasoActual()).isEmpty();
+        }
+
+        @Test
         void cadaPasoUsaSuPropioTiempoLimite() {
             var flujo = Solicitudes.flujoCon(List.of(
                 new PasoAprobacion(1, JEFE, null, 24), new PasoAprobacion(2, GERENTE, null, 72)));

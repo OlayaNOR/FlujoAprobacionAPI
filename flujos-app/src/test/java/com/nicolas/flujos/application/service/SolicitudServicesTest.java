@@ -13,6 +13,7 @@ import com.nicolas.flujos.application.port.in.CrearSolicitudCommand;
 import com.nicolas.flujos.application.port.in.EditarSolicitudCommand;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.IdempotenciaRepository;
+import com.nicolas.flujos.application.port.out.MetricasSolicitudes;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.flujo.PasoAprobacion;
 import com.nicolas.flujos.domain.flujo.RolAprobador;
@@ -48,7 +49,8 @@ class SolicitudServicesTest {
     private final SolicitudRepository repositorio = mock(SolicitudRepository.class);
     private final AprobacionRepository aprobaciones = mock(AprobacionRepository.class);
     private final AccesoSolicitudes acceso = new AccesoSolicitudes(repositorio, aprobaciones);
-    private final CrearSolicitudService crear = new CrearSolicitudService(repositorio, mock(IdempotenciaRepository.class), RELOJ, USD);
+    private final CrearSolicitudService crear = new CrearSolicitudService(repositorio, mock(IdempotenciaRepository.class),
+        mock(MetricasSolicitudes.class), RELOJ, USD);
     private final ConsultarSolicitudService consultar = new ConsultarSolicitudService(acceso);
     private final EditarSolicitudService editar = new EditarSolicitudService(acceso, repositorio, RELOJ, USD);
 
