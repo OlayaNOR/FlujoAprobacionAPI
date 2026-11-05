@@ -18,3 +18,14 @@ Proyecto en desarrollo.
 ```bash
 ./mvnw verify
 ```
+
+## Levantar con Docker
+
+```bash
+cp .env.example .env   # y completar las contraseñas
+docker compose up --build
+```
+
+La API queda en `http://localhost:8080` y el estado en `/actuator/health`.
+
+El contenedor de PostgreSQL usa `flujos_migrador` como superusuario para simplificar el entorno local. En producción ese usuario solo debería tener permisos de DDL sobre el esquema.
