@@ -27,6 +27,14 @@ app:
   negocio:
     moneda-base: USD
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  # ordenado para que el contrato guardado en las pruebas no cambie solo por el orden de las claves
+  writer-with-order-by-keys: true
+  default-produces-media-type: application/json
+
 management:
   endpoints:
     web:

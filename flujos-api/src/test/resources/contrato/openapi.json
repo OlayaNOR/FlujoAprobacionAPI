@@ -1,0 +1,1808 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "description" : "Solicitudes internas (vacaciones, compras y gastos) con aprobación por niveles.\n\nPara probarla: hacer login con uno de los usuarios de ejemplo del README, copiar el `accessToken` y pegarlo en **Authorize**. Los errores siguen el formato RFC 7807.",
+    "title" : "Flujos de Aprobación API",
+    "version" : "v1"
+  },
+  "security" : [ {
+    "bearer" : [ ]
+  } ],
+  "tags" : [ {
+    "description" : "Pasos de aprobación de cada tipo de solicitud",
+    "name" : "Flujos"
+  } ],
+  "paths" : {
+    "/api/v1/auth/login" : {
+      "post" : {
+        "description" : "Entrega un access token de 15 minutos y un refresh token de 7 días. Acepta 5 intentos por minuto por IP y bloquea el email después de 10 fallos en una hora.",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TokensResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Email o contraseña incorrectos",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/credenciales-invalidas"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Credenciales o refresh token inválidos"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Demasiados intentos de login desde esta dirección. Espera antes de volver a intentar.",
+                  "status" : 429,
+                  "title" : "Demasiados intentos",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/demasiados-intentos"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Demasiados intentos de login",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Segundos que hay que esperar",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ],
+        "summary" : "Inicia sesión",
+        "tags" : [ "Autenticación" ]
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "operationId" : "logout",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          }
+        },
+        "summary" : "Cierra la sesión del refresh token",
+        "tags" : [ "Autenticación" ]
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "description" : "El refresh token usado queda invalidado. Usarlo otra vez cierra todas las sesiones del usuario.",
+        "operationId" : "refresh",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TokensResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Email o contraseña incorrectos",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/credenciales-invalidas"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Credenciales o refresh token inválidos"
+          }
+        },
+        "security" : [ ],
+        "summary" : "Renueva los tokens",
+        "tags" : [ "Autenticación" ]
+      }
+    },
+    "/api/v1/flujos/{tipo}" : {
+      "get" : {
+        "operationId" : "consultar_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tipo",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FlujoResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          }
+        },
+        "summary" : "Consulta los pasos de un tipo de solicitud",
+        "tags" : [ "Flujos" ]
+      },
+      "put" : {
+        "description" : "El orden de los pasos es su posición en la lista. Las solicitudes que ya están en aprobación siguen con los pasos que tenían al enviarse.",
+        "operationId" : "reemplazar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tipo",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReemplazarPasosRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FlujoResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La moneda debe ser USD",
+                  "status" : 422,
+                  "title" : "La petición viola una regla de negocio",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/regla-negocio"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "La petición viola una regla de negocio"
+          }
+        },
+        "summary" : "Reemplaza los pasos de un flujo",
+        "tags" : [ "Flujos" ]
+      }
+    },
+    "/api/v1/solicitudes" : {
+      "get" : {
+        "description" : "Cada usuario ve las suyas y las que tiene por aprobar. ADMIN ve todas. `sort` acepta creadaEn, monto o estado, con ,asc o ,desc.",
+        "operationId" : "listar",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "estado",
+          "required" : false,
+          "schema" : {
+            "uniqueItems" : true,
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "BORRADOR", "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA", "CERRADA" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "tipo",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "desde",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "hasta",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "creadaEn,desc"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaginaSolicitudResumenResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          }
+        },
+        "summary" : "Lista solicitudes",
+        "tags" : [ "Solicitudes" ]
+      },
+      "post" : {
+        "description" : "COMPRA y GASTO llevan `monto`; VACACIONES lleva `periodo`.",
+        "operationId" : "crear",
+        "parameters" : [ {
+          "description" : "Si se repite con el mismo cuerpo, devuelve la solicitud que ya se creó en vez de crear otra",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CrearSolicitudRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "Creada, o la misma respuesta de antes si se repite la clave"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La moneda debe ser USD",
+                  "status" : 422,
+                  "title" : "La petición viola una regla de negocio",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/regla-negocio"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "La petición viola una regla de negocio"
+          }
+        },
+        "summary" : "Crea una solicitud en borrador",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}" : {
+      "get" : {
+        "operationId" : "consultar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          }
+        },
+        "summary" : "Consulta una solicitud",
+        "tags" : [ "Solicitudes" ]
+      },
+      "put" : {
+        "description" : "Solo el solicitante y solo en BORRADOR.",
+        "operationId" : "editar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EditarSolicitudRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La solicitud está en APROBADA y no puede pasar a CANCELADA.",
+                  "estadoActual" : "APROBADA",
+                  "status" : 409,
+                  "title" : "Transición de estado no permitida",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/transicion-invalida"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El estado actual no permite la acción, o alguien la modificó al mismo tiempo"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La moneda debe ser USD",
+                  "status" : 422,
+                  "title" : "La petición viola una regla de negocio",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/regla-negocio"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "La petición viola una regla de negocio"
+          }
+        },
+        "summary" : "Edita un borrador",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}/auditoria" : {
+      "get" : {
+        "description" : "`actorId` es null cuando la acción la hizo el sistema.",
+        "operationId" : "auditoria",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/RegistroAuditoriaResponse"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          }
+        },
+        "summary" : "Historial de transiciones",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}/cancelacion" : {
+      "post" : {
+        "description" : "Solo el solicitante, en BORRADOR o PENDIENTE.",
+        "operationId" : "cancelar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La solicitud está en APROBADA y no puede pasar a CANCELADA.",
+                  "estadoActual" : "APROBADA",
+                  "status" : 409,
+                  "title" : "Transición de estado no permitida",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/transicion-invalida"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El estado actual no permite la acción, o alguien la modificó al mismo tiempo"
+          }
+        },
+        "summary" : "Cancela una solicitud",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}/cierre" : {
+      "post" : {
+        "operationId" : "cerrar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La solicitud está en APROBADA y no puede pasar a CANCELADA.",
+                  "estadoActual" : "APROBADA",
+                  "status" : 409,
+                  "title" : "Transición de estado no permitida",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/transicion-invalida"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El estado actual no permite la acción, o alguien la modificó al mismo tiempo"
+          }
+        },
+        "summary" : "Cierra una solicitud aprobada",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}/decisiones" : {
+      "post" : {
+        "description" : "Solo el aprobador asignado. Rechazar exige comentario.",
+        "operationId" : "decidir",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "errores" : [ {
+                    "campo" : "monto.valor",
+                    "mensaje" : "must be greater than or equal to 0.01"
+                  } ],
+                  "status" : 400,
+                  "title" : "La solicitud contiene errores de validación",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/validacion"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Datos inválidos o mal formados"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La solicitud está en APROBADA y no puede pasar a CANCELADA.",
+                  "estadoActual" : "APROBADA",
+                  "status" : 409,
+                  "title" : "Transición de estado no permitida",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/transicion-invalida"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El estado actual no permite la acción, o alguien la modificó al mismo tiempo"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La moneda debe ser USD",
+                  "status" : 422,
+                  "title" : "La petición viola una regla de negocio",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/regla-negocio"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "La petición viola una regla de negocio"
+          }
+        },
+        "summary" : "Aprueba o rechaza el paso actual",
+        "tags" : [ "Solicitudes" ]
+      }
+    },
+    "/api/v1/solicitudes/{id}/envio" : {
+      "post" : {
+        "description" : "Toma los pasos del flujo que aplican al monto o a los días y asigna el primer aprobador. Si no aplica ningún paso, queda aprobada de una vez.",
+        "operationId" : "enviar",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SolicitudResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Falta el token de acceso, es inválido o expiró.",
+                  "status" : 401,
+                  "title" : "No autenticado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-autenticado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "Falta el token, es inválido o expiró"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "No tienes permisos para esta operación.",
+                  "status" : 403,
+                  "title" : "Acceso denegado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/acceso-denegado"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El usuario no tiene permiso para la operación"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "Solicitud no encontrada",
+                  "status" : 404,
+                  "title" : "Recurso no encontrado",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/no-encontrada"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "No existe, o existe pero el usuario no puede verla"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La solicitud está en APROBADA y no puede pasar a CANCELADA.",
+                  "estadoActual" : "APROBADA",
+                  "status" : 409,
+                  "title" : "Transición de estado no permitida",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/transicion-invalida"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "El estado actual no permite la acción, o alguien la modificó al mismo tiempo"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "example" : {
+                  "detail" : "La moneda debe ser USD",
+                  "status" : 422,
+                  "title" : "La petición viola una regla de negocio",
+                  "traceId" : "6744d1f3b0c2a9e15f0d8c7b2a4e9f10",
+                  "type" : "https://flujos.api/errores/regla-negocio"
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description" : "La petición viola una regla de negocio"
+          }
+        },
+        "summary" : "Envía a aprobación",
+        "tags" : [ "Solicitudes" ]
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "CrearSolicitudRequest" : {
+        "required" : [ "tipo" ],
+        "type" : "object",
+        "properties" : {
+          "monto" : {
+            "$ref" : "#/components/schemas/MontoRequest"
+          },
+          "motivo" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string",
+            "example" : "Monitor para el puesto de diseño"
+          },
+          "periodo" : {
+            "$ref" : "#/components/schemas/PeriodoRequest"
+          },
+          "tipo" : {
+            "type" : "string",
+            "example" : "COMPRA",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        }
+      },
+      "DecisionRequest" : {
+        "required" : [ "tipo" ],
+        "type" : "object",
+        "properties" : {
+          "comentario" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Obligatorio al rechazar",
+            "example" : "Visto bueno"
+          },
+          "tipo" : {
+            "type" : "string",
+            "example" : "APROBAR",
+            "enum" : [ "APROBAR", "RECHAZAR" ]
+          }
+        }
+      },
+      "EditarSolicitudRequest" : {
+        "type" : "object",
+        "properties" : {
+          "monto" : {
+            "$ref" : "#/components/schemas/MontoRequest"
+          },
+          "motivo" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "periodo" : {
+            "$ref" : "#/components/schemas/PeriodoRequest"
+          }
+        }
+      },
+      "FlujoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "activo" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "pasos" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PasoFlujoResponse"
+            }
+          },
+          "tipo" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "required" : [ "email", "password" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string",
+            "example" : "empleado@flujos.test"
+          },
+          "password" : {
+            "maxLength" : 72,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "Monto" : {
+        "type" : "object",
+        "properties" : {
+          "moneda" : {
+            "type" : "string"
+          },
+          "valor" : {
+            "type" : "number"
+          }
+        }
+      },
+      "MontoRequest" : {
+        "required" : [ "moneda", "valor" ],
+        "type" : "object",
+        "properties" : {
+          "moneda" : {
+            "pattern" : "[A-Z]{3}",
+            "type" : "string",
+            "example" : "USD"
+          },
+          "valor" : {
+            "maximum" : 9.9999999999999E11,
+            "exclusiveMaximum" : false,
+            "minimum" : 0.01,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "example" : 1500.0
+          }
+        }
+      },
+      "PaginaSolicitudResumenResponse" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SolicitudResumenResponse"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PasoFlujoRequest" : {
+        "required" : [ "rolAprobador", "tiempoLimiteHoras" ],
+        "type" : "object",
+        "properties" : {
+          "rolAprobador" : {
+            "type" : "string",
+            "example" : "GERENTE",
+            "enum" : [ "JEFE", "RRHH", "GERENTE", "DIRECTOR" ]
+          },
+          "tiempoLimiteHoras" : {
+            "maximum" : 8760,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "example" : 48
+          },
+          "umbralMinimo" : {
+            "type" : "number",
+            "description" : "El paso solo aplica desde este monto, o desde estos días en vacaciones. Sin umbral aplica siempre",
+            "example" : 1000.0
+          }
+        }
+      },
+      "PasoFlujoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "orden" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rolAprobador" : {
+            "type" : "string",
+            "enum" : [ "JEFE", "RRHH", "GERENTE", "DIRECTOR" ]
+          },
+          "tiempoLimiteHoras" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "umbralMinimo" : {
+            "type" : "number"
+          }
+        }
+      },
+      "Periodo" : {
+        "type" : "object",
+        "properties" : {
+          "fin" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "inicio" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
+      "PeriodoRequest" : {
+        "required" : [ "fin", "inicio" ],
+        "type" : "object",
+        "properties" : {
+          "fin" : {
+            "type" : "string",
+            "format" : "date",
+            "example" : "2026-12-18"
+          },
+          "inicio" : {
+            "type" : "string",
+            "format" : "date",
+            "example" : "2026-12-14"
+          }
+        }
+      },
+      "Problema" : {
+        "type" : "object",
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "errores" : {
+            "type" : "array",
+            "description" : "Solo en los 400 de validación",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "campo" : {
+                  "type" : "string"
+                },
+                "mensaje" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "estadoActual" : {
+            "type" : "string",
+            "description" : "Solo en los 409 por estado"
+          },
+          "instance" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "traceId" : {
+            "type" : "string",
+            "description" : "Para buscar la petición en los logs"
+          },
+          "type" : {
+            "type" : "string",
+            "format" : "uri"
+          }
+        },
+        "description" : "Error en formato RFC 7807"
+      },
+      "ReemplazarPasosRequest" : {
+        "required" : [ "pasos" ],
+        "type" : "object",
+        "properties" : {
+          "pasos" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PasoFlujoRequest"
+            }
+          }
+        }
+      },
+      "RefreshTokenRequest" : {
+        "required" : [ "refreshToken" ],
+        "type" : "object",
+        "properties" : {
+          "refreshToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "RegistroAuditoriaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accion" : {
+            "type" : "string",
+            "enum" : [ "ENVIADA", "APROBADA", "RECHAZADA", "ESCALADA", "ESCALADA_ADMIN", "CANCELADA", "CERRADA" ]
+          },
+          "actorId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "detalle" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "estadoAnterior" : {
+            "type" : "string",
+            "enum" : [ "BORRADOR", "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA", "CERRADA" ]
+          },
+          "estadoNuevo" : {
+            "type" : "string",
+            "enum" : [ "BORRADOR", "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA", "CERRADA" ]
+          },
+          "ocurridoEn" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "SolicitudResponse" : {
+        "type" : "object",
+        "properties" : {
+          "actualizadaEn" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "aprobadorActualId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "creadaEn" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "estado" : {
+            "type" : "string",
+            "enum" : [ "BORRADOR", "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA", "CERRADA" ]
+          },
+          "fechaLimitePaso" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "monto" : {
+            "$ref" : "#/components/schemas/Monto"
+          },
+          "motivo" : {
+            "type" : "string"
+          },
+          "pasoActual" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "periodo" : {
+            "$ref" : "#/components/schemas/Periodo"
+          },
+          "solicitanteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "tipo" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        }
+      },
+      "SolicitudResumenResponse" : {
+        "type" : "object",
+        "properties" : {
+          "creadaEn" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "estado" : {
+            "type" : "string",
+            "enum" : [ "BORRADOR", "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA", "CERRADA" ]
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "monto" : {
+            "$ref" : "#/components/schemas/Monto"
+          },
+          "pasoActual" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "periodo" : {
+            "$ref" : "#/components/schemas/Periodo"
+          },
+          "solicitanteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "tipo" : {
+            "type" : "string",
+            "enum" : [ "VACACIONES", "COMPRA", "GASTO" ]
+          }
+        }
+      },
+      "TokensResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearer" : {
+        "bearerFormat" : "JWT",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  }
+}
