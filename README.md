@@ -2,7 +2,7 @@
 
 API REST para gestionar solicitudes internas (vacaciones, compras, gastos) con aprobaciones por niveles, auditoría y escalamiento por tiempo.
 
-Proyecto en desarrollo.
+Proyecto en desarrollo. Ver [qué falta](#qué-falta).
 
 ## Módulos
 
@@ -51,3 +51,36 @@ curl -X POST localhost:8080/api/v1/auth/login \
 ```
 
 El access token dura 15 minutos. Para renovarlo se envía el refresh token a `POST /api/v1/auth/refresh`, que entrega un par nuevo e invalida el anterior.
+
+## Solicitudes
+
+Todas las rutas van bajo `/api/v1` y exigen `Authorization: Bearer <accessToken>`.
+
+| Método | Ruta | Qué hace | Quién puede |
+|---|---|---|---|
+| POST | `/solicitudes` | Crea en `BORRADOR` | Rol EMPLEADO |
+| GET | `/solicitudes` | Lista con filtros | Cada uno ve lo suyo y lo que tiene por aprobar; ADMIN ve todo |
+| GET | `/solicitudes/{id}` | Detalle | Solicitante, aprobador asignado, ADMIN |
+| PUT | `/solicitudes/{id}` | Edita un borrador | Solicitante |
+| POST | `/solicitudes/{id}/envio` | Envía a aprobación | Solicitante |
+| POST | `/solicitudes/{id}/cancelacion` | Cancela | Solicitante |
+
+Quien no puede ver una solicitud recibe 404 aunque exista ([ADR-006](docs/adr/ADR-006-404-para-recursos-ajenos.md)).
+
+Filtros de `GET /solicitudes`: `estado` (se puede repetir), `tipo`, `desde`, `hasta`, `page`, `size` (máximo 100) y `sort` (`creadaEn`, `monto` o `estado`, con `,asc` o `,desc`).
+
+```bash
+curl -X POST localhost:8080/api/v1/solicitudes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"tipo":"COMPRA","monto":{"valor":1250.50,"moneda":"USD"},"motivo":"Licencias"}'
+```
+
+Los errores usan `application/problem+json`. El criterio entre 409 y 422 está en el [ADR-005](docs/adr/ADR-005-409-vs-422.md).
+
+## Qué falta
+
+- Aprobar y rechazar: una solicitud enviada todavía no puede avanzar más allá de `PENDIENTE`, salvo un gasto menor a 200 USD, que se aprueba solo.
+- Auditoría de transiciones, cierre e idempotencia en la creación.
+- Publicación de eventos con outbox: hoy el dominio los genera, pero no se guardan.
+- Job de escalamiento, rate limiting en el login, métricas y documentación OpenAPI.
