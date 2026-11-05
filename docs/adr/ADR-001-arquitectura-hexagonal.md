@@ -14,4 +14,4 @@ Separar el código en cuatro módulos Maven: `flujos-domain`, `flujos-app`, `flu
 
 - Más archivos `pom.xml` y un build algo más largo.
 - Las entidades JPA son clases distintas de los agregados, con un mapper entre ambas.
-- Si los módulos estorban, se puede volver a uno solo y validar las reglas con ArchUnit.
+- Los módulos no cubren todo: no impiden que `flujos-app` use otras partes de Spring, ni que un controlador llame a un servicio sin pasar por su interfaz. Eso lo revisan las pruebas de ArchUnit en `flujos-api`, que es el único módulo con todas las clases en el classpath.

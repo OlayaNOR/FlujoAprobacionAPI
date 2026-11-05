@@ -1,8 +1,10 @@
 # Flujos de Aprobación API
 
+[![ci](https://github.com/OlayaNOR/FlujoAprobacionAPI/actions/workflows/ci.yml/badge.svg)](https://github.com/OlayaNOR/FlujoAprobacionAPI/actions/workflows/ci.yml)
+
 API REST para gestionar solicitudes internas (vacaciones, compras, gastos) con aprobaciones por niveles, auditoría y escalamiento por tiempo.
 
-Proyecto en desarrollo. Ver [qué falta](#qué-falta).
+Lo que no está implementado, y por qué, está en [qué falta](#qué-falta).
 
 ## Módulos
 
@@ -13,11 +15,24 @@ Proyecto en desarrollo. Ver [qué falta](#qué-falta).
 | `flujos-infra` | JPA, seguridad, jobs. | app |
 | `flujos-api` | Controladores y arranque de la aplicación. | app (infra solo en runtime) |
 
-## Compilar
+## Compilar y probar
 
 ```bash
 ./mvnw verify
 ```
+
+Necesita Docker corriendo: las pruebas de integración levantan PostgreSQL con Testcontainers.
+
+| Pruebas | Dónde | Qué cubren |
+|---|---|---|
+| Unitarias | `flujos-domain`, `flujos-app` | Estados, reglas de los flujos, casos de uso con repositorios simulados |
+| Integración | `flujos-infra`, `flujos-api` (`*IT`) | Repositorios, migraciones, seguridad, errores y concurrencia contra PostgreSQL real |
+| Arquitectura | `ArquitecturaTest` | Que el dominio no use frameworks, qué partes de Spring entran a la aplicación y que los controladores pasen por los casos de uso |
+| Contrato | `ContratoOpenApiIT` | Que el OpenAPI generado sea igual al guardado ([ADR-014](docs/adr/ADR-014-contrato-openapi.md)) |
+
+El build falla si la cobertura de líneas de `flujos-domain` o `flujos-app` baja de 80%. El reporte queda en `<módulo>/target/site/jacoco/index.html`. En la API y la infraestructura no hay mínimo: ahí lo que importa lo cubren las pruebas de integración.
+
+El CI de GitHub Actions corre lo mismo en cada push a `main` y en cada pull request, y después construye la imagen de Docker.
 
 ## Levantar con Docker
 
@@ -26,7 +41,7 @@ cp .env.example .env   # completar contraseñas y JWT_SECRET
 docker compose up --build
 ```
 
-La API queda en `http://localhost:8080` y el estado en `/actuator/health`.
+La API queda en `http://localhost:8080`, la documentación en [`/swagger-ui.html`](http://localhost:8080/swagger-ui.html) y el estado en `/actuator/health`.
 
 El contenedor de PostgreSQL usa `flujos_migrador` como superusuario para simplificar el entorno local. En producción ese usuario solo debería tener permisos de DDL sobre el esquema.
 
@@ -127,6 +142,38 @@ Los flujos iniciales son:
 - Métricas propias: `solicitudes.creadas` (por tipo), `solicitudes.por_estado` (gauge, se actualiza cada minuto) y `aprobaciones.tiempo_respuesta` (timer por tipo y resultado, desde que el paso le llega al aprobador hasta que decide). Se registran al confirmar la transacción.
 - Los logs salen en JSON salvo en el perfil `local`, e incluyen `traceId` y `spanId`. El mismo `traceId` aparece en las respuestas de error, para encontrar el log de una petición que falló.
 
+## Documentación de la API
+
+Swagger UI está en `/swagger-ui.html` y el OpenAPI en `/v3/api-docs`. Cada endpoint muestra sus errores posibles con un ejemplo. Para probar desde ahí: hacer login, copiar el `accessToken` y pegarlo en **Authorize**.
+
+Si un cambio modifica el contrato a propósito, la prueba de contrato falla hasta regenerar el archivo guardado:
+
+```bash
+./mvnw verify -Dcontrato.actualizar=true
+```
+
+## Colección de Bruno
+
+En [`bruno/`](bruno) está la colección para [Bruno](https://www.usebruno.com/), con el entorno `local`. Hace el login de cada rol, una compra que pasa por los tres niveles hasta el cierre, un gasto que se aprueba solo, unas vacaciones rechazadas y algunos errores (422, 409 y 404). Cada petición tiene pruebas de su respuesta.
+
+Desde la línea de comandos, con la app corriendo:
+
+```bash
+cd bruno && npx @usebruno/cli run -r --env local
+```
+
+La colección hace cinco logins. Si se corre dos veces en menos de un minuto, el límite por IP responde 429 en la segunda.
+
+## Diagramas y decisiones
+
+- [Estados de una solicitud](docs/diagramas/estados.md) y [componentes](docs/diagramas/componentes.md), en Mermaid.
+- [Decisiones de arquitectura](docs/adr), del ADR-001 al ADR-014.
+
 ## Qué falta
 
-- Documentación OpenAPI, pruebas de arquitectura con ArchUnit, CI con cobertura y colección de Bruno (fase 4).
+- **Demo desplegada.** Todavía no hay una instancia pública.
+- **Auditoría de cambios a los flujos.** Solo queda una línea en el log con quién cambió qué ([ADR-012](docs/adr/ADR-012-flujos-configurables.md)).
+- **Activar o desactivar un flujo.** El campo `activo` existe, pero solo se puede cambiar en la base de datos.
+- **Límites del login con varias instancias.** Los contadores viven en memoria, así que cada instancia lleva su propia cuenta ([ADR-008](docs/adr/ADR-008-rate-limiting-en-memoria.md)).
+- **Limpieza de tablas.** Las filas ya publicadas del outbox y las claves de idempotencia viejas no se borran.
+- **Notificaciones reales.** Los eventos se publican en el log; un adaptador de correo o de cola se conecta en `PublicadorEventos` sin tocar los casos de uso.
