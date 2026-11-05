@@ -23,6 +23,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -48,6 +49,11 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     @ExceptionHandler(SolicitudNoEncontradaException.class)
     ProblemDetail noEncontrada(SolicitudNoEncontradaException ex) {
         return problema(HttpStatus.NOT_FOUND, "no-encontrada", "Recurso no encontrado", "Solicitud no encontrada");
+    }
+
+    @ExceptionHandler(ParametroInvalidoException.class)
+    ProblemDetail parametroInvalido(ParametroInvalidoException ex) {
+        return problema(HttpStatus.BAD_REQUEST, "parametro-invalido", "Parámetro inválido", ex.getMessage());
     }
 
     @ExceptionHandler(ReglaNegocioException.class)
@@ -97,6 +103,21 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
                                                                   WebRequest request) {
         List<ErrorCampo> errores = ex.getBindingResult().getFieldErrors().stream()
             .map(e -> new ErrorCampo(e.getField(), e.getDefaultMessage()))
+            .toList();
+        var pd = problema(HttpStatus.BAD_REQUEST, "validacion",
+            "La solicitud contiene errores de validación", null);
+        pd.setProperty("errores", errores);
+        return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    // Validaciones directas sobre parámetros, como @Max en size. Las de un @RequestBody llegan por el método anterior.
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+                                                                            HttpHeaders headers, HttpStatusCode status,
+                                                                            WebRequest request) {
+        List<ErrorCampo> errores = ex.getAllValidationResults().stream()
+            .flatMap(resultado -> resultado.getResolvableErrors().stream()
+                .map(e -> new ErrorCampo(resultado.getMethodParameter().getParameterName(), e.getDefaultMessage())))
             .toList();
         var pd = problema(HttpStatus.BAD_REQUEST, "validacion",
             "La solicitud contiene errores de validación", null);

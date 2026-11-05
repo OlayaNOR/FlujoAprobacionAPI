@@ -2,6 +2,7 @@ package com.nicolas.flujos.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,6 +17,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -204,6 +207,107 @@ class SolicitudesIT extends IntegracionBase {
         editar(id, ana, "EMPLEADO", "{\"monto\":{\"valor\":1,\"moneda\":\"USD\"}}")
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.estadoActual").value("PENDIENTE"));
+    }
+
+    @Test
+    void elListadoDeUnEmpleadoSoloTraeLoSuyo() throws Exception {
+        var ana = crearUsuario();
+        var deAna = idDe(crear(ana, COMPRA));
+        crear(crearUsuario(), COMPRA);
+
+        listar(ana, "EMPLEADO", "")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(deAna))
+            .andExpect(jsonPath("$.content[0].motivo").doesNotExist());
+    }
+
+    @Test
+    void elAprobadorVeLoQueTienePorAprobar() throws Exception {
+        var jefe = crearUsuario();
+        var id = idDe(crear(crearUsuario(), COMPRA));
+        jdbc.update("UPDATE solicitud SET estado = 'PENDIENTE', paso_actual = 1, aprobador_actual_id = ? WHERE id = ?",
+            jefe, UUID.fromString(id));
+
+        listar(jefe, "APROBADOR", "").andExpect(jsonPath("$.content[0].id").value(id));
+        consultar(id, jefe, "APROBADOR").andExpect(status().isOk());
+    }
+
+    @Test
+    void elAdminVeSolicitudesDeTodos() throws Exception {
+        var id = idDe(crear(crearUsuario(), COMPRA));
+
+        listar(UUID.randomUUID(), "ADMIN", "?size=100")
+            .andExpect(jsonPath("$.content[*].id", hasItem(id)));
+    }
+
+    @Test
+    void laRespuestaTraeLosDatosDePaginacion() throws Exception {
+        var ana = crearUsuario();
+        for (int i = 0; i < 3; i++) {
+            crear(ana, COMPRA);
+        }
+
+        listar(ana, "EMPLEADO", "?page=1&size=2")
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.page").value(1))
+            .andExpect(jsonPath("$.size").value(2))
+            .andExpect(jsonPath("$.totalElements").value(3))
+            .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    @Test
+    void filtraPorVariosEstadosYPorTipo() throws Exception {
+        var ana = crearUsuario();
+        var compra = idDe(crear(ana, COMPRA));
+        var gasto = idDe(crear(ana, "{\"tipo\":\"GASTO\",\"monto\":{\"valor\":10,\"moneda\":\"USD\"}}"));
+        jdbc.update("UPDATE solicitud SET estado = 'CANCELADA' WHERE id = ?", UUID.fromString(gasto));
+
+        listar(ana, "EMPLEADO", "?tipo=GASTO").andExpect(jsonPath("$.content[0].id").value(gasto));
+        listar(ana, "EMPLEADO", "?estado=BORRADOR").andExpect(jsonPath("$.content[0].id").value(compra));
+        listar(ana, "EMPLEADO", "?estado=BORRADOR&estado=CANCELADA").andExpect(jsonPath("$.totalElements").value(2));
+        listar(ana, "EMPLEADO", "?estado=CERRADA").andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void filtraPorFechaDeCreacion() throws Exception {
+        var ana = crearUsuario();
+        crear(ana, COMPRA);
+
+        listar(ana, "EMPLEADO", "?desde=2020-01-01T00:00:00Z").andExpect(jsonPath("$.totalElements").value(1));
+        listar(ana, "EMPLEADO", "?hasta=2020-01-01T00:00:00Z").andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void ordenaPorMontoEnAmbasDirecciones() throws Exception {
+        var ana = crearUsuario();
+        for (var valor : new int[] {300, 100, 200}) {
+            crear(ana, "{\"tipo\":\"COMPRA\",\"monto\":{\"valor\":%d,\"moneda\":\"USD\"}}".formatted(valor));
+        }
+
+        listar(ana, "EMPLEADO", "?sort=monto,asc").andExpect(jsonPath("$.content[0].monto.valor").value(100.0));
+        listar(ana, "EMPLEADO", "?sort=monto,desc").andExpect(jsonPath("$.content[0].monto.valor").value(300.0));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "?sort=solicitanteId,desc", "?sort=monto,sideways", "?sort=monto,asc,otra",
+        "?size=101", "?size=0", "?page=-1", "?page=abc", "?estado=XYZ", "?tipo=XYZ", "?desde=ayer"
+    })
+    void parametrosInvalidosDevuelven400ConProblemJson(String consulta) throws Exception {
+        listar(UUID.randomUUID(), "EMPLEADO", consulta)
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentType(PROBLEM_JSON));
+    }
+
+    @Test
+    void elSizeInvalidoIndicaElParametro() throws Exception {
+        listar(UUID.randomUUID(), "EMPLEADO", "?size=101")
+            .andExpect(jsonPath("$.errores[0].campo").value("size"));
+    }
+
+    private ResultActions listar(UUID usuario, String rol, String consulta) throws Exception {
+        return mvc.perform(get(RUTA + consulta).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
     }
 
     private ResultActions crear(UUID usuario, String cuerpo) throws Exception {
