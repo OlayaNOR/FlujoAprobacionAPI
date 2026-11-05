@@ -1,6 +1,7 @@
 package com.nicolas.flujos.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
@@ -15,7 +16,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -304,6 +309,164 @@ class SolicitudesIT extends IntegracionBase {
     void elSizeInvalidoIndicaElParametro() throws Exception {
         listar(UUID.randomUUID(), "EMPLEADO", "?size=101")
             .andExpect(jsonPath("$.errores[0].campo").value("size"));
+    }
+
+    @Test
+    void enviarAsignaAlJefeDirectoYDejaLaSolicitudPendiente() throws Exception {
+        var jefe = crearAprobador();
+        var ana = crearUsuarioConJefe(jefe);
+        var id = idDe(crear(ana, COMPRA));
+
+        accion(id, "envio", ana, "EMPLEADO")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estado").value("PENDIENTE"))
+            .andExpect(jsonPath("$.pasoActual").value(1))
+            .andExpect(jsonPath("$.aprobadorActualId").value(jefe.toString()))
+            .andExpect(jsonPath("$.fechaLimitePaso").exists());
+
+        consultar(id, jefe, "APROBADOR").andExpect(status().isOk());
+    }
+
+    @Test
+    void unGastoPequenoSeApruebaAlEnviarSinNecesitarJefe() throws Exception {
+        var ana = crearUsuario();
+        var id = idDe(crear(ana, "{\"tipo\":\"GASTO\",\"monto\":{\"valor\":50,\"moneda\":\"USD\"}}"));
+
+        accion(id, "envio", ana, "EMPLEADO")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estado").value("APROBADA"))
+            .andExpect(jsonPath("$.aprobadorActualId").doesNotExist());
+    }
+
+    @Test
+    void enviarSinJefeDevuelve422YLaSolicitudSigueEnBorrador() throws Exception {
+        var ana = crearUsuario();
+        var id = idDe(crear(ana, COMPRA));
+
+        accion(id, "envio", ana, "EMPLEADO")
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(content().contentType(PROBLEM_JSON));
+
+        consultar(id, ana, "EMPLEADO").andExpect(jsonPath("$.estado").value("BORRADOR"));
+    }
+
+    @Test
+    void unJefeSinRolAprobadorNoPuedeRecibirSolicitudes() throws Exception {
+        var ana = crearUsuarioConJefe(crearUsuario());
+        var id = idDe(crear(ana, COMPRA));
+
+        accion(id, "envio", ana, "EMPLEADO").andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void enviarDosVecesDevuelve409ConEstadoActual() throws Exception {
+        var ana = crearUsuarioConJefe(crearAprobador());
+        var id = idDe(crear(ana, COMPRA));
+        accion(id, "envio", ana, "EMPLEADO").andExpect(status().isOk());
+
+        accion(id, "envio", ana, "EMPLEADO")
+            .andExpect(status().isConflict())
+            .andExpect(content().contentType(PROBLEM_JSON))
+            .andExpect(jsonPath("$.type").value("https://flujos.api/errores/transicion-invalida"))
+            .andExpect(jsonPath("$.estadoActual").value("PENDIENTE"));
+    }
+
+    @Test
+    void enviosSimultaneosSoloGanaUnoYLosDemasReciben409() throws Exception {
+        var ana = crearUsuarioConJefe(crearAprobador());
+        var id = idDe(crear(ana, COMPRA));
+        var intentos = 5;
+        var largada = new CountDownLatch(1);
+        var codigos = new ArrayList<Integer>();
+
+        try (var hilos = Executors.newFixedThreadPool(intentos)) {
+            var resultados = new ArrayList<Future<Integer>>();
+            for (int i = 0; i < intentos; i++) {
+                resultados.add(hilos.submit(() -> {
+                    largada.await();
+                    return accion(id, "envio", ana, "EMPLEADO").andReturn().getResponse().getStatus();
+                }));
+            }
+            largada.countDown();
+            for (var resultado : resultados) {
+                codigos.add(resultado.get());
+            }
+        }
+
+        assertThat(codigos).containsOnly(200, 409).filteredOn(codigo -> codigo == 200).hasSize(1);
+    }
+
+    @Test
+    void unTerceroQueIntentaEnviarOCancelarRecibe404() throws Exception {
+        var id = idDe(crear(crearUsuario(), COMPRA));
+        var luis = crearUsuario();
+
+        accion(id, "envio", luis, "EMPLEADO").andExpect(status().isNotFound());
+        accion(id, "cancelacion", luis, "EMPLEADO").andExpect(status().isNotFound());
+    }
+
+    @Test
+    void elDuenoCancelaUnBorrador() throws Exception {
+        var ana = crearUsuario();
+        var id = idDe(crear(ana, COMPRA));
+
+        accion(id, "cancelacion", ana, "EMPLEADO")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estado").value("CANCELADA"));
+    }
+
+    @Test
+    void cancelarUnaPendienteConservaElPasoYQuitaLaSolicitudAlAprobador() throws Exception {
+        var jefe = crearAprobador();
+        var ana = crearUsuarioConJefe(jefe);
+        var id = idDe(crear(ana, COMPRA));
+        accion(id, "envio", ana, "EMPLEADO");
+
+        accion(id, "cancelacion", ana, "EMPLEADO")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.pasoActual").value(1))
+            .andExpect(jsonPath("$.aprobadorActualId").doesNotExist());
+
+        consultar(id, jefe, "APROBADOR").andExpect(status().isNotFound());
+    }
+
+    @Test
+    void elAprobadorAsignadoVePeroNoPuedeCancelar() throws Exception {
+        var jefe = crearAprobador();
+        var ana = crearUsuarioConJefe(jefe);
+        var id = idDe(crear(ana, COMPRA));
+        accion(id, "envio", ana, "EMPLEADO");
+
+        accion(id, "cancelacion", jefe, "APROBADOR").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void desdeUnEstadoFinalNoHayMasTransiciones() throws Exception {
+        var ana = crearUsuario();
+        var id = idDe(crear(ana, COMPRA));
+        accion(id, "cancelacion", ana, "EMPLEADO");
+
+        accion(id, "envio", ana, "EMPLEADO")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.estadoActual").value("CANCELADA"))
+            .andExpect(jsonPath("$.detail", containsString("CANCELADA")));
+        accion(id, "cancelacion", ana, "EMPLEADO").andExpect(status().isConflict());
+    }
+
+    private ResultActions accion(String id, String accion, UUID usuario, String rol) throws Exception {
+        return mvc.perform(post(RUTA + "/" + id + "/" + accion).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
+    }
+
+    private UUID crearAprobador() {
+        var id = crearUsuario();
+        jdbc.update("INSERT INTO usuario_rol (usuario_id, rol) VALUES (?, 'APROBADOR')", id);
+        return id;
+    }
+
+    private UUID crearUsuarioConJefe(UUID jefe) {
+        var id = crearUsuario();
+        jdbc.update("UPDATE usuario SET jefe_id = ? WHERE id = ?", jefe, id);
+        return id;
     }
 
     private ResultActions listar(UUID usuario, String rol, String consulta) throws Exception {

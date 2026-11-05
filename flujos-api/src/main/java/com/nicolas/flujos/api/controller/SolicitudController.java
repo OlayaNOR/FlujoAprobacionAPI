@@ -6,9 +6,11 @@ import com.nicolas.flujos.api.dto.SolicitudResponse;
 import com.nicolas.flujos.api.dto.SolicitudResumenResponse;
 import com.nicolas.flujos.api.mapper.SolicitudMapper;
 import com.nicolas.flujos.application.port.in.Actor;
+import com.nicolas.flujos.application.port.in.CancelarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.CrearSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.EditarSolicitudUseCase;
+import com.nicolas.flujos.application.port.in.EnviarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.FiltroSolicitud;
 import com.nicolas.flujos.application.port.in.ListarSolicitudesUseCase;
 import com.nicolas.flujos.application.port.in.Pagina;
@@ -45,14 +47,19 @@ class SolicitudController {
     private final ConsultarSolicitudUseCase consultar;
     private final EditarSolicitudUseCase editar;
     private final ListarSolicitudesUseCase listar;
+    private final EnviarSolicitudUseCase enviar;
+    private final CancelarSolicitudUseCase cancelar;
     private final SolicitudMapper mapper;
 
     SolicitudController(CrearSolicitudUseCase crear, ConsultarSolicitudUseCase consultar,
-                        EditarSolicitudUseCase editar, ListarSolicitudesUseCase listar, SolicitudMapper mapper) {
+                        EditarSolicitudUseCase editar, ListarSolicitudesUseCase listar,
+                        EnviarSolicitudUseCase enviar, CancelarSolicitudUseCase cancelar, SolicitudMapper mapper) {
         this.crear = crear;
         this.consultar = consultar;
         this.editar = editar;
         this.listar = listar;
+        this.enviar = enviar;
+        this.cancelar = cancelar;
         this.mapper = mapper;
     }
 
@@ -88,5 +95,15 @@ class SolicitudController {
     SolicitudResponse editar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id,
                              @Valid @RequestBody EditarSolicitudRequest request) {
         return mapper.aResponse(editar.ejecutar(mapper.aComando(request, new SolicitudId(id), actor)));
+    }
+
+    @PostMapping("/{id}/envio")
+    SolicitudResponse enviar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
+        return mapper.aResponse(enviar.ejecutar(new SolicitudId(id), actor));
+    }
+
+    @PostMapping("/{id}/cancelacion")
+    SolicitudResponse cancelar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
+        return mapper.aResponse(cancelar.ejecutar(new SolicitudId(id), actor));
     }
 }
