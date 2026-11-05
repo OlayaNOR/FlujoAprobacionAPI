@@ -5,6 +5,7 @@ import com.nicolas.flujos.application.port.in.EnviarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.SolicitudDetalle;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
 import com.nicolas.flujos.application.port.out.FlujoRepository;
+import com.nicolas.flujos.application.port.out.OutboxRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
@@ -25,15 +26,18 @@ class EnviarSolicitudService implements EnviarSolicitudUseCase {
     private final FlujoRepository flujos;
     private final AsignadorAprobador asignador;
     private final AuditoriaRepository auditoria;
+    private final OutboxRepository outbox;
     private final Clock clock;
 
     EnviarSolicitudService(AccesoSolicitudes acceso, SolicitudRepository solicitudes, FlujoRepository flujos,
-                           AsignadorAprobador asignador, AuditoriaRepository auditoria, Clock clock) {
+                           AsignadorAprobador asignador, AuditoriaRepository auditoria, OutboxRepository outbox,
+                           Clock clock) {
         this.acceso = acceso;
         this.solicitudes = solicitudes;
         this.flujos = flujos;
         this.asignador = asignador;
         this.auditoria = auditoria;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -54,6 +58,7 @@ class EnviarSolicitudService implements EnviarSolicitudUseCase {
                 Map.of("automatica", true, "enviadaPor", actor.id().valor().toString()), ahora)
             : RegistroAuditoria.de(solicitud, AccionAuditoria.ENVIADA, actor.id(), estadoAnterior,
                 Map.of("paso", solicitud.getPasoActual()), ahora));
+        solicitud.pullEventos().forEach(outbox::encolar);
         return SolicitudDetalle.de(solicitud);
     }
 }

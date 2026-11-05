@@ -13,6 +13,7 @@ import com.nicolas.flujos.application.port.in.DecidirSolicitudCommand;
 import com.nicolas.flujos.application.port.in.TipoDecision;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
+import com.nicolas.flujos.application.port.out.OutboxRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
@@ -23,6 +24,7 @@ import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.AccionNoPermitidaException;
 import com.nicolas.flujos.domain.solicitud.Decision;
 import com.nicolas.flujos.domain.solicitud.EstadoSolicitud;
+import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudRechazada;
 import com.nicolas.flujos.domain.solicitud.ResultadoDecision;
 import com.nicolas.flujos.domain.solicitud.Solicitud;
 import com.nicolas.flujos.domain.solicitud.SolicitudId;
@@ -45,12 +47,13 @@ class DecidirSolicitudServiceTest {
     private final SolicitudRepository solicitudes = mock(SolicitudRepository.class);
     private final AprobacionRepository aprobaciones = mock(AprobacionRepository.class);
     private final AuditoriaRepository auditoria = mock(AuditoriaRepository.class);
+    private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final UsuarioId dueno = UsuarioId.nuevo();
     private final UsuarioId jefe = UsuarioId.nuevo();
     private final UsuarioId gerente = UsuarioId.nuevo();
 
     private final DecidirSolicitudService servicio = new DecidirSolicitudService(
-        new AccesoSolicitudes(solicitudes, aprobaciones), solicitudes, aprobaciones, auditoria,
+        new AccesoSolicitudes(solicitudes, aprobaciones), solicitudes, aprobaciones, auditoria, outbox,
         (rol, solicitante) -> gerente, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
@@ -81,6 +84,7 @@ class DecidirSolicitudServiceTest {
         assertThat(detalle.estado()).isEqualTo(EstadoSolicitud.RECHAZADA);
         assertThat(decisionGuardada().resultado()).isEqualTo(ResultadoDecision.RECHAZADA);
         assertThat(registroGuardado().accion()).isEqualTo(AccionAuditoria.RECHAZADA);
+        verify(outbox).encolar(new SolicitudRechazada(solicitud.getId(), AHORA));
     }
 
     @Test
@@ -92,6 +96,7 @@ class DecidirSolicitudServiceTest {
 
         verify(solicitudes, never()).guardar(any());
         verify(aprobaciones, never()).registrar(any());
+        verify(outbox, never()).encolar(any());
     }
 
     @Test

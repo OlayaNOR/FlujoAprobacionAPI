@@ -5,6 +5,7 @@ import com.nicolas.flujos.application.port.in.DecidirSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.SolicitudDetalle;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
+import com.nicolas.flujos.application.port.out.OutboxRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
@@ -24,16 +25,18 @@ class DecidirSolicitudService implements DecidirSolicitudUseCase {
     private final SolicitudRepository solicitudes;
     private final AprobacionRepository aprobaciones;
     private final AuditoriaRepository auditoria;
+    private final OutboxRepository outbox;
     private final AsignadorAprobador asignador;
     private final Clock clock;
 
     DecidirSolicitudService(AccesoSolicitudes acceso, SolicitudRepository solicitudes,
                             AprobacionRepository aprobaciones, AuditoriaRepository auditoria,
-                            AsignadorAprobador asignador, Clock clock) {
+                            OutboxRepository outbox, AsignadorAprobador asignador, Clock clock) {
         this.acceso = acceso;
         this.solicitudes = solicitudes;
         this.aprobaciones = aprobaciones;
         this.auditoria = auditoria;
+        this.outbox = outbox;
         this.asignador = asignador;
         this.clock = clock;
     }
@@ -65,6 +68,7 @@ class DecidirSolicitudService implements DecidirSolicitudUseCase {
         aprobaciones.registrar(decision);
         auditoria.registrar(RegistroAuditoria.de(solicitud, accionDe(resultado), aprobador, estadoAnterior,
             detalle(paso, c.comentario()), ahora));
+        solicitud.pullEventos().forEach(outbox::encolar);
         return SolicitudDetalle.de(solicitud);
     }
 

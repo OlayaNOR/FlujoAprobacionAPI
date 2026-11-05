@@ -117,5 +117,4 @@ Los flujos iniciales son:
 
 ## Qué falta
 
-- Publicación de eventos con outbox: hoy el dominio los genera, pero no se guardan.
 - Job de escalamiento, rate limiting en el login, métricas y documentación OpenAPI.

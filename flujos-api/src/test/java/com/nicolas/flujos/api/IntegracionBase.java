@@ -26,5 +26,6 @@ abstract class IntegracionBase {
         r.add("spring.flyway.password", PG::getPassword);
         r.add("spring.flyway.placeholders.appPassword", () -> PASSWORD_APP);
         r.add("app.seguridad.jwt.secreto", () -> SECRETO_JWT);
+        r.add("app.jobs.habilitados", () -> "false");
     }
 }

@@ -12,6 +12,7 @@ import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
 import com.nicolas.flujos.application.port.out.FlujoRepository;
+import com.nicolas.flujos.application.port.out.OutboxRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
@@ -22,6 +23,8 @@ import com.nicolas.flujos.domain.flujo.RolAprobador;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.EstadoSolicitud;
+import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudAprobada;
+import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudEnviada;
 import com.nicolas.flujos.domain.solicitud.Solicitud;
 import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
 import com.nicolas.flujos.domain.solicitud.TransicionInvalidaException;
@@ -48,6 +51,7 @@ class EnviarSolicitudServiceTest {
     private final SolicitudRepository solicitudes = mock(SolicitudRepository.class);
     private final FlujoRepository flujos = mock(FlujoRepository.class);
     private final AuditoriaRepository auditoria = mock(AuditoriaRepository.class);
+    private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final UsuarioId dueno = UsuarioId.nuevo();
     private final UsuarioId jefe = UsuarioId.nuevo();
 
@@ -57,6 +61,7 @@ class EnviarSolicitudServiceTest {
         flujos,
         (rol, solicitante) -> jefe,
         auditoria,
+        outbox,
         Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach
@@ -77,6 +82,7 @@ class EnviarSolicitudServiceTest {
         assertThat(registro.actorId()).isEqualTo(dueno);
         assertThat(registro.estadoAnterior()).isEqualTo(EstadoSolicitud.BORRADOR);
         assertThat(registro.estadoNuevo()).isEqualTo(EstadoSolicitud.PENDIENTE);
+        verify(outbox).encolar(new SolicitudEnviada(solicitud.getId(), jefe, AHORA));
     }
 
     @Test
@@ -89,6 +95,7 @@ class EnviarSolicitudServiceTest {
         assertThat(registro.accion()).isEqualTo(AccionAuditoria.APROBADA);
         assertThat(registro.actorId()).isNull();
         assertThat(registro.detalle()).containsEntry("automatica", true);
+        verify(outbox).encolar(new SolicitudAprobada(solicitud.getId(), AHORA));
     }
 
     @Test
@@ -101,6 +108,7 @@ class EnviarSolicitudServiceTest {
 
         verify(solicitudes, never()).guardar(any());
         verify(auditoria, never()).registrar(any());
+        verify(outbox, never()).encolar(any());
     }
 
     @Test
