@@ -1,0 +1,25 @@
+meta {
+  name: Cancelar una rechazada: 409
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{vacacionesId}}/cancelacion
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 409", function() {
+    expect(res.status).to.equal(409);
+  });
+
+  test("indica el estado actual", function() {
+    expect(res.body.estadoActual).to.equal("RECHAZADA");
+  });
+}

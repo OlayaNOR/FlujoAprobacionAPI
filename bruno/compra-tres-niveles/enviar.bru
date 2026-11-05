@@ -1,0 +1,33 @@
+meta {
+  name: Enviar a aprobación
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{compraId}}/envio
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("queda en PENDIENTE", function() {
+    expect(res.body.estado).to.equal("PENDIENTE");
+  });
+
+  test("empieza en el paso 1", function() {
+    expect(res.body.pasoActual).to.equal(1);
+  });
+}
+
+docs {
+  Con 15000 USD aplican los tres pasos del flujo de compras: JEFE, GERENTE (desde 1000) y DIRECTOR (desde 10000.01).
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Login empleado
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "empleado@flujos.test",
+    "password": "{{password}}"
+  }
+}
+
+script:post-response {
+  bru.setVar("tokenEmpleado", res.body.accessToken);
+  bru.setVar("refreshEmpleado", res.body.refreshToken);
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  El login acepta 5 intentos por minuto desde la misma IP. Si se corre la colección dos veces seguidas,
+  el segundo login de más responde 429: hay que esperar lo que diga Retry-After.
+}

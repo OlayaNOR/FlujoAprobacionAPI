@@ -1,0 +1,36 @@
+meta {
+  name: Aprueba el jefe
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{compraId}}/decisiones
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenJefe}}
+}
+
+body:json {
+  {
+    "tipo": "APROBAR",
+    "comentario": "Visto bueno"
+  }
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("queda en PENDIENTE", function() {
+    expect(res.body.estado).to.equal("PENDIENTE");
+  });
+
+  test("pasa al paso 2", function() {
+    expect(res.body.pasoActual).to.equal(2);
+  });
+}

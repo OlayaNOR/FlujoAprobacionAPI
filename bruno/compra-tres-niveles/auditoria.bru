@@ -1,0 +1,26 @@
+meta {
+  name: Ver la auditoría
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/solicitudes/{{compraId}}/auditoria
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("registra el envío y las tres aprobaciones", function() {
+    const acciones = res.body.map(r => r.accion);
+    expect(acciones).to.deep.equal(["ENVIADA", "APROBADA", "APROBADA", "APROBADA"]);
+  });
+}

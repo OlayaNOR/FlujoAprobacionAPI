@@ -1,0 +1,33 @@
+meta {
+  name: Crear gasto de 150
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+body:json {
+  {
+    "tipo": "GASTO",
+    "monto": { "valor": 150, "moneda": "USD" },
+    "motivo": "Taxi al aeropuerto"
+  }
+}
+
+script:post-response {
+  bru.setVar("gastoId", res.body.id);
+}
+
+tests {
+  test("responde 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}

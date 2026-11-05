@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Flujos de Aprobación",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

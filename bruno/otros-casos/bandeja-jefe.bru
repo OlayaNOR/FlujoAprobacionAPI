@@ -1,0 +1,25 @@
+meta {
+  name: Bandeja del jefe
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/solicitudes?estado=PENDIENTE&sort=creadaEn,desc&size=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenJefe}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("todas las de la página están pendientes", function() {
+    res.body.content.forEach(s => expect(s.estado).to.equal("PENDIENTE"));
+  });
+}

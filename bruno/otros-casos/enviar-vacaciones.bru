@@ -1,0 +1,29 @@
+meta {
+  name: Enviar vacaciones
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{vacacionesId}}/envio
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("queda en PENDIENTE", function() {
+    expect(res.body.estado).to.equal("PENDIENTE");
+  });
+}
+
+docs {
+  Con menos de 4 días solo aprueba el jefe; desde 4 días también RRHH.
+}

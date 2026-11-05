@@ -1,0 +1,32 @@
+meta {
+  name: Renovar tokens del empleado
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshEmpleado}}"
+  }
+}
+
+script:post-response {
+  bru.setVar("tokenEmpleado", res.body.accessToken);
+  bru.setVar("refreshEmpleado", res.body.refreshToken);
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("entrega un refresh token nuevo", function() {
+    expect(res.body.refreshToken).to.not.equal(req.getBody().refreshToken);
+  });
+}

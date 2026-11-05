@@ -1,0 +1,33 @@
+meta {
+  name: Reemplazar pasos de gastos (admin)
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/flujos/GASTO
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenAdmin}}
+}
+
+body:json {
+  {
+    "pasos": [
+      { "rolAprobador": "JEFE", "umbralMinimo": 200, "tiempoLimiteHoras": 48 }
+    ]
+  }
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Deja los mismos pasos que trae la migración inicial; cambiarlos solo afecta a las solicitudes que se envíen después.
+}

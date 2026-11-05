@@ -1,0 +1,29 @@
+meta {
+  name: Enviar gasto: se aprueba solo
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{gastoId}}/envio
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("queda en APROBADA", function() {
+    expect(res.body.estado).to.equal("APROBADA");
+  });
+}
+
+docs {
+  El único paso del flujo de gastos es JEFE desde 200 USD. Por debajo no aplica ningún paso y queda aprobada al enviarse.
+}

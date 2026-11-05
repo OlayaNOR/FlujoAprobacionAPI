@@ -1,0 +1,27 @@
+meta {
+  name: Rechazar sin comentario: 422
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes/{{vacacionesId}}/decisiones
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenJefe}}
+}
+
+body:json {
+  {
+    "tipo": "RECHAZAR"
+  }
+}
+
+tests {
+  test("responde 422", function() {
+    expect(res.status).to.equal(422);
+  });
+}

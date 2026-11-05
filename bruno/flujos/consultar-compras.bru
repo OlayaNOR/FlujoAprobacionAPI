@@ -1,0 +1,25 @@
+meta {
+  name: Consultar flujo de compras
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/flujos/COMPRA
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+tests {
+  test("responde 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("tiene tres pasos", function() {
+    expect(res.body.pasos.map(p => p.rolAprobador)).to.deep.equal(["JEFE", "GERENTE", "DIRECTOR"]);
+  });
+}

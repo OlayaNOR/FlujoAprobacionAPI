@@ -1,0 +1,39 @@
+meta {
+  name: Crear vacaciones de 3 días
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+body:json {
+  {
+    "tipo": "VACACIONES",
+    "periodo": { "inicio": "{{inicio}}", "fin": "{{fin}}" }
+  }
+}
+
+script:pre-request {
+  // fechas relativas a hoy para que la petición no envejezca
+  const dia = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  bru.setVar("inicio", dia(30));
+  bru.setVar("fin", dia(32));
+}
+
+script:post-response {
+  bru.setVar("vacacionesId", res.body.id);
+}
+
+tests {
+  test("responde 201", function() {
+    expect(res.status).to.equal(201);
+  });
+}

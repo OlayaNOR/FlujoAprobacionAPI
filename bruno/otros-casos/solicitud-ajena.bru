@@ -1,0 +1,25 @@
+meta {
+  name: Ver una solicitud ajena: 404
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/solicitudes/{{vacacionesId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tokenGerente}}
+}
+
+tests {
+  test("responde 404", function() {
+    expect(res.status).to.equal(404);
+  });
+}
+
+docs {
+  El gerente no es el solicitante ni aprobó nada en esta solicitud: recibe 404 y no 403, para no revelar que existe.
+}

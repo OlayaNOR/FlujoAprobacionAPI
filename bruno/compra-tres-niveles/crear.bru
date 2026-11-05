@@ -1,0 +1,46 @@
+meta {
+  name: Crear compra de 15000
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/solicitudes
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: {{claveCompra}}
+}
+
+auth:bearer {
+  token: {{tokenEmpleado}}
+}
+
+body:json {
+  {
+    "tipo": "COMPRA",
+    "monto": { "valor": 15000, "moneda": "USD" },
+    "motivo": "Servidores para el laboratorio"
+  }
+}
+
+script:pre-request {
+  // una clave nueva por corrida; repetir la petición con la misma clave devuelve la misma solicitud
+  bru.setVar("claveCompra", "compra-" + Date.now());
+}
+
+script:post-response {
+  bru.setVar("compraId", res.body.id);
+}
+
+tests {
+  test("responde 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("queda en BORRADOR", function() {
+    expect(res.body.estado).to.equal("BORRADOR");
+  });
+}
