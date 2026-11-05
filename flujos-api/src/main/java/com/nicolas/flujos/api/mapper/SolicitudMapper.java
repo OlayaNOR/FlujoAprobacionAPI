@@ -3,6 +3,7 @@ package com.nicolas.flujos.api.mapper;
 import com.nicolas.flujos.api.dto.CrearSolicitudRequest;
 import com.nicolas.flujos.api.dto.EditarSolicitudRequest;
 import com.nicolas.flujos.api.dto.MontoRequest;
+import com.nicolas.flujos.api.dto.RegistroAuditoriaResponse;
 import com.nicolas.flujos.api.dto.SolicitudResponse;
 import com.nicolas.flujos.api.dto.SolicitudResumenResponse;
 import com.nicolas.flujos.application.port.in.Actor;
@@ -10,6 +11,7 @@ import com.nicolas.flujos.application.port.in.CrearSolicitudCommand;
 import com.nicolas.flujos.application.port.in.EditarSolicitudCommand;
 import com.nicolas.flujos.application.port.in.SolicitudDetalle;
 import com.nicolas.flujos.application.port.in.SolicitudResumen;
+import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.SolicitudId;
@@ -32,6 +34,8 @@ public interface SolicitudMapper {
     SolicitudResponse aResponse(SolicitudDetalle detalle);
 
     SolicitudResumenResponse aResponse(SolicitudResumen resumen);
+
+    RegistroAuditoriaResponse aResponse(RegistroAuditoria registro);
 
     default Money money(MontoRequest monto) {
         return monto == null ? null : new Money(monto.valor(), moneda(monto.moneda()));

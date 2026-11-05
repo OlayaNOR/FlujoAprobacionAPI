@@ -2,11 +2,13 @@ package com.nicolas.flujos.api.controller;
 
 import com.nicolas.flujos.api.dto.CrearSolicitudRequest;
 import com.nicolas.flujos.api.dto.EditarSolicitudRequest;
+import com.nicolas.flujos.api.dto.RegistroAuditoriaResponse;
 import com.nicolas.flujos.api.dto.SolicitudResponse;
 import com.nicolas.flujos.api.dto.SolicitudResumenResponse;
 import com.nicolas.flujos.api.mapper.SolicitudMapper;
 import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.CancelarSolicitudUseCase;
+import com.nicolas.flujos.application.port.in.ConsultarAuditoriaUseCase;
 import com.nicolas.flujos.application.port.in.ConsultarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.CrearSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.EditarSolicitudUseCase;
@@ -23,6 +25,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -49,17 +52,20 @@ class SolicitudController {
     private final ListarSolicitudesUseCase listar;
     private final EnviarSolicitudUseCase enviar;
     private final CancelarSolicitudUseCase cancelar;
+    private final ConsultarAuditoriaUseCase consultarAuditoria;
     private final SolicitudMapper mapper;
 
     SolicitudController(CrearSolicitudUseCase crear, ConsultarSolicitudUseCase consultar,
                         EditarSolicitudUseCase editar, ListarSolicitudesUseCase listar,
-                        EnviarSolicitudUseCase enviar, CancelarSolicitudUseCase cancelar, SolicitudMapper mapper) {
+                        EnviarSolicitudUseCase enviar, CancelarSolicitudUseCase cancelar,
+                        ConsultarAuditoriaUseCase consultarAuditoria, SolicitudMapper mapper) {
         this.crear = crear;
         this.consultar = consultar;
         this.editar = editar;
         this.listar = listar;
         this.enviar = enviar;
         this.cancelar = cancelar;
+        this.consultarAuditoria = consultarAuditoria;
         this.mapper = mapper;
     }
 
@@ -95,6 +101,11 @@ class SolicitudController {
     SolicitudResponse editar(@AuthenticationPrincipal Actor actor, @PathVariable UUID id,
                              @Valid @RequestBody EditarSolicitudRequest request) {
         return mapper.aResponse(editar.ejecutar(mapper.aComando(request, new SolicitudId(id), actor)));
+    }
+
+    @GetMapping("/{id}/auditoria")
+    List<RegistroAuditoriaResponse> auditoria(@AuthenticationPrincipal Actor actor, @PathVariable UUID id) {
+        return consultarAuditoria.ejecutar(new SolicitudId(id), actor).stream().map(mapper::aResponse).toList();
     }
 
     @PostMapping("/{id}/envio")

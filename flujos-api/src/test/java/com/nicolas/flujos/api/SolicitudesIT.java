@@ -5,15 +5,12 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -24,28 +21,10 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-class SolicitudesIT extends IntegracionBase {
-
-    private static final String RUTA = "/api/v1/solicitudes";
-    private static final String PROBLEM_JSON = "application/problem+json";
-    private static final String COMPRA = """
-        {"tipo":"COMPRA","monto":{"valor":1250.50,"moneda":"USD"},"motivo":"Licencias"}
-        """;
-
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired ObjectMapper mapper;
+class SolicitudesIT extends PruebaApi {
 
     @Test
     void crearDevuelve201ConLocationYEstadoBorrador() throws Exception {
@@ -451,54 +430,5 @@ class SolicitudesIT extends IntegracionBase {
             .andExpect(jsonPath("$.estadoActual").value("CANCELADA"))
             .andExpect(jsonPath("$.detail", containsString("CANCELADA")));
         accion(id, "cancelacion", ana, "EMPLEADO").andExpect(status().isConflict());
-    }
-
-    private ResultActions accion(String id, String accion, UUID usuario, String rol) throws Exception {
-        return mvc.perform(post(RUTA + "/" + id + "/" + accion).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
-    }
-
-    private UUID crearAprobador() {
-        var id = crearUsuario();
-        jdbc.update("INSERT INTO usuario_rol (usuario_id, rol) VALUES (?, 'APROBADOR')", id);
-        return id;
-    }
-
-    private UUID crearUsuarioConJefe(UUID jefe) {
-        var id = crearUsuario();
-        jdbc.update("UPDATE usuario SET jefe_id = ? WHERE id = ?", jefe, id);
-        return id;
-    }
-
-    private ResultActions listar(UUID usuario, String rol, String consulta) throws Exception {
-        return mvc.perform(get(RUTA + consulta).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
-    }
-
-    private ResultActions crear(UUID usuario, String cuerpo) throws Exception {
-        return mvc.perform(post(RUTA).header(HttpHeaders.AUTHORIZATION, bearer(usuario, "EMPLEADO"))
-            .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
-    }
-
-    private ResultActions consultar(String id, UUID usuario, String rol) throws Exception {
-        return mvc.perform(get(RUTA + "/" + id).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol)));
-    }
-
-    private ResultActions editar(String id, UUID usuario, String rol, String cuerpo) throws Exception {
-        return mvc.perform(put(RUTA + "/" + id).header(HttpHeaders.AUTHORIZATION, bearer(usuario, rol))
-            .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
-    }
-
-    private String idDe(ResultActions resultado) throws Exception {
-        return mapper.readTree(resultado.andReturn().getResponse().getContentAsString()).get("id").asText();
-    }
-
-    private UUID crearUsuario() {
-        var id = UUID.randomUUID();
-        jdbc.update("INSERT INTO usuario (id, email, nombre, password_hash) VALUES (?, ?, 'Prueba', 'hash')",
-            id, id + "@flujos.test");
-        return id;
-    }
-
-    private static String bearer(UUID usuario, String... roles) {
-        return "Bearer " + TokenDePrueba.para(usuario, roles);
     }
 }
