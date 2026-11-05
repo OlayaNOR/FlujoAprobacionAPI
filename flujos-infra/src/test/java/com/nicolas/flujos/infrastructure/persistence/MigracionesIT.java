@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Map;
+import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,21 @@ class MigracionesIT {
         try (Connection c = conexionApp(); Statement st = c.createStatement()) {
             assertThatThrownBy(() -> st.executeUpdate("DROP TABLE solicitud"))
                 .isInstanceOf(SQLException.class);
+        }
+    }
+
+    @Test
+    void unUsuarioNoPuedeSerSuPropioJefe() throws SQLException {
+        var id = UUID.randomUUID();
+        var insert = """
+            INSERT INTO usuario (id, email, nombre, password_hash, jefe_id)
+            VALUES ('%s', 'x@flujos.test', 'X', 'hash', '%s')
+            """.formatted(id, id);
+
+        try (Connection c = conexionApp(); Statement st = c.createStatement()) {
+            assertThatThrownBy(() -> st.executeUpdate(insert))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("chk_jefe_distinto");
         }
     }
 
