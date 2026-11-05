@@ -1,7 +1,9 @@
 package com.nicolas.flujos.domain.solicitud;
 
+import static com.nicolas.flujos.domain.flujo.RolAprobador.DIRECTOR;
 import static com.nicolas.flujos.domain.flujo.RolAprobador.GERENTE;
 import static com.nicolas.flujos.domain.flujo.RolAprobador.JEFE;
+import static com.nicolas.flujos.domain.flujo.RolAprobador.RRHH;
 import static com.nicolas.flujos.domain.solicitud.Solicitudes.AHORA;
 import static com.nicolas.flujos.domain.solicitud.Solicitudes.ASIGNADOR;
 import static com.nicolas.flujos.domain.solicitud.Solicitudes.HOY;
@@ -12,7 +14,9 @@ import static com.nicolas.flujos.domain.solicitud.Solicitudes.USD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.nicolas.flujos.domain.regla.ReglaAprobacion;
+import com.nicolas.flujos.domain.flujo.Flujo;
+import com.nicolas.flujos.domain.flujo.FlujoId;
+import com.nicolas.flujos.domain.flujo.PasoAprobacion;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
@@ -20,16 +24,21 @@ import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudAprobada;
 import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudEnviada;
 import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudEscalada;
 import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudRechazada;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class SolicitudTest {
 
-    private static final ReglaAprobacion UN_PASO = Solicitudes.reglaCon(JEFE);
-    private static final ReglaAprobacion DOS_PASOS = Solicitudes.reglaCon(JEFE, GERENTE);
-    private static final ReglaAprobacion SIN_PASOS = Solicitudes.reglaCon();
+    private static final Flujo UN_PASO = Solicitudes.flujoCon(JEFE);
+    private static final Flujo DOS_PASOS = Solicitudes.flujoCon(JEFE, GERENTE);
+    // Solicitudes.enBorrador() es de 500: no alcanza el umbral de ningún paso
+    private static final Flujo SIN_PASOS = Solicitudes.flujoCon(
+        List.of(new PasoAprobacion(1, JEFE, new BigDecimal("1000"), 48)));
     private static final Instant VENCIDA = AHORA.plus(LIMITE).plus(Duration.ofMinutes(1));
 
     @Nested
@@ -180,7 +189,7 @@ class SolicitudTest {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
             var despues = AHORA.plus(Duration.ofHours(5));
 
-            solicitud.aprobar(Solicitudes.JEFE, DOS_PASOS, ASIGNADOR, despues);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, despues);
 
             assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
             assertThat(solicitud.getPasoActual()).isEqualTo(2);
@@ -191,10 +200,10 @@ class SolicitudTest {
         @Test
         void ultimoPasoDejaLaSolicitudAprobada() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
-            solicitud.aprobar(Solicitudes.JEFE, DOS_PASOS, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
             solicitud.pullEventos();
 
-            solicitud.aprobar(Solicitudes.GERENTE, DOS_PASOS, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.GERENTE, ASIGNADOR, AHORA);
 
             assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.APROBADA);
             assertThat(solicitud.getAprobadorActualId()).isNull();
@@ -206,7 +215,7 @@ class SolicitudTest {
         void soloPuedeAprobarElAprobadorDelPasoActual() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
 
-            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.GERENTE, DOS_PASOS, ASIGNADOR, AHORA))
+            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.GERENTE, ASIGNADOR, AHORA))
                 .isInstanceOf(AccionNoPermitidaException.class);
             assertThat(solicitud.getPasoActual()).isEqualTo(1);
         }
@@ -215,16 +224,16 @@ class SolicitudTest {
         void noSePuedeAprobarUnBorrador() {
             var solicitud = Solicitudes.enBorrador();
 
-            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA))
+            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA))
                 .isInstanceOf(TransicionInvalidaException.class);
         }
 
         @Test
         void unAprobadorQueYaDecidioNoPuedeRepetir() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
-            solicitud.aprobar(Solicitudes.JEFE, DOS_PASOS, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
 
-            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, DOS_PASOS, ASIGNADOR, AHORA))
+            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA))
                 .isInstanceOf(AccionNoPermitidaException.class);
         }
     }
@@ -255,7 +264,7 @@ class SolicitudTest {
             var solicitud = Solicitudes.pendiente(UN_PASO);
             solicitud.rechazar(Solicitudes.JEFE, AHORA);
 
-            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA))
+            assertThatThrownBy(() -> solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA))
                 .isInstanceOf(TransicionInvalidaException.class)
                 .hasMessageContaining("RECHAZADA");
         }
@@ -267,7 +276,7 @@ class SolicitudTest {
         @Test
         void desdePendienteConservaElPasoEnElQueSeCancelo() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
-            solicitud.aprobar(Solicitudes.JEFE, DOS_PASOS, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
 
             solicitud.cancelar(SOLICITANTE, AHORA);
 
@@ -287,7 +296,7 @@ class SolicitudTest {
         @Test
         void unaSolicitudAprobadaYaNoSePuedeCancelar() {
             var solicitud = Solicitudes.pendiente(UN_PASO);
-            solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
 
             assertThatThrownBy(() -> solicitud.cancelar(SOLICITANTE, AHORA))
                 .isInstanceOf(TransicionInvalidaException.class);
@@ -300,7 +309,7 @@ class SolicitudTest {
         @Test
         void unaSolicitudAprobadaSePuedeCerrar() {
             var solicitud = Solicitudes.pendiente(UN_PASO);
-            solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA);
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
 
             solicitud.cerrar(AHORA);
 
@@ -323,7 +332,7 @@ class SolicitudTest {
         void conPasoSiguienteAvanzaYNoNotificaAlAdmin() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
 
-            solicitud.escalar(DOS_PASOS, ASIGNADOR, VENCIDA);
+            solicitud.escalar(ASIGNADOR, VENCIDA);
 
             assertThat(solicitud.getPasoActual()).isEqualTo(2);
             assertThat(solicitud.getAprobadorActualId()).isEqualTo(Solicitudes.GERENTE);
@@ -336,7 +345,7 @@ class SolicitudTest {
         void enElUltimoPasoNotificaAlAdminYSigueEnPendiente() {
             var solicitud = Solicitudes.pendiente(UN_PASO);
 
-            solicitud.escalar(UN_PASO, ASIGNADOR, VENCIDA);
+            solicitud.escalar(ASIGNADOR, VENCIDA);
 
             assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
             assertThat(solicitud.getAprobadorActualId()).isEqualTo(Solicitudes.JEFE);
@@ -348,7 +357,7 @@ class SolicitudTest {
         void trasNotificarAlAdminNoVuelveAContarComoVencida() {
             var solicitud = Solicitudes.pendiente(UN_PASO);
 
-            solicitud.escalar(UN_PASO, ASIGNADOR, VENCIDA);
+            solicitud.escalar(ASIGNADOR, VENCIDA);
 
             assertThat(solicitud.estaVencida(VENCIDA.plus(Duration.ofDays(30)))).isFalse();
         }
@@ -357,7 +366,7 @@ class SolicitudTest {
         void siElPlazoNoHaVencidoNoHaceNada() {
             var solicitud = Solicitudes.pendiente(DOS_PASOS);
 
-            solicitud.escalar(DOS_PASOS, ASIGNADOR, AHORA.plus(Duration.ofHours(1)));
+            solicitud.escalar(ASIGNADOR, AHORA.plus(Duration.ofHours(1)));
 
             assertThat(solicitud.getPasoActual()).isEqualTo(1);
             assertThat(solicitud.pullEventos()).isEmpty();
@@ -367,7 +376,7 @@ class SolicitudTest {
         void unBorradorNoSeEscala() {
             var solicitud = Solicitudes.enBorrador();
 
-            assertThatThrownBy(() -> solicitud.escalar(UN_PASO, ASIGNADOR, VENCIDA))
+            assertThatThrownBy(() -> solicitud.escalar(ASIGNADOR, VENCIDA))
                 .isInstanceOf(TransicionInvalidaException.class);
         }
     }
@@ -376,12 +385,82 @@ class SolicitudTest {
     void reconstituirAceptaUnPeriodoPasadoYPermiteContinuarElFlujo() {
         var periodo = new Periodo(HOY.minusDays(30), HOY.minusDays(25));
         var solicitud = Solicitud.reconstituir(SolicitudId.nuevo(), SOLICITANTE, TipoSolicitud.VACACIONES, null, periodo,
-            null, EstadoSolicitud.PENDIENTE, 1, Solicitudes.JEFE, AHORA, 3, AHORA, AHORA);
+            null, EstadoSolicitud.PENDIENTE, UN_PASO.getPasos(), 1, Solicitudes.JEFE, AHORA, 3, AHORA, AHORA);
 
-        solicitud.aprobar(Solicitudes.JEFE, UN_PASO, ASIGNADOR, AHORA);
+        solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
 
         assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.APROBADA);
         assertThat(solicitud.getVersion()).isEqualTo(3);
+    }
+
+    @Nested
+    class PasosDelFlujo {
+
+        @Test
+        void cambiarElFlujoNoAfectaAUnaSolicitudEnCurso() {
+            var flujo = Solicitudes.flujoCon(JEFE, GERENTE);
+            var solicitud = Solicitudes.pendiente(flujo);
+
+            flujo.reemplazarPasos(List.of(new PasoAprobacion(1, DIRECTOR, null, 1)));
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
+
+            assertThat(solicitud.getPasoActual()).isEqualTo(2);
+            assertThat(solicitud.getAprobadorActualId()).isEqualTo(Solicitudes.GERENTE);
+            solicitud.aprobar(Solicitudes.GERENTE, ASIGNADOR, AHORA);
+            assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.APROBADA);
+        }
+
+        @Test
+        void soloCopiaLosPasosCuyoUmbralAlcanza() {
+            var flujo = Solicitudes.flujoCon(List.of(
+                new PasoAprobacion(1, JEFE, null, 48), new PasoAprobacion(2, GERENTE, new BigDecimal("1000"), 48)));
+
+            var pequena = Solicitudes.compra("999.99");
+            pequena.enviar(flujo, ASIGNADOR, AHORA);
+            var grande = Solicitudes.compra("1000");
+            grande.enviar(flujo, ASIGNADOR, AHORA);
+
+            assertThat(pequena.getPasos()).hasSize(1);
+            assertThat(grande.getPasos()).hasSize(2);
+        }
+
+        @Test
+        void enVacacionesElUmbralSeComparaContraLosDias() {
+            var flujo = Solicitudes.flujoCon(List.of(
+                new PasoAprobacion(1, JEFE, null, 48), new PasoAprobacion(2, RRHH, new BigDecimal("4"), 48)));
+
+            var tresDias = Solicitud.nuevasVacaciones(SOLICITANTE, new Periodo(HOY, HOY.plusDays(2)), null, HOY, AHORA);
+            tresDias.enviar(flujo, ASIGNADOR, AHORA);
+            var cuatroDias = Solicitud.nuevasVacaciones(SOLICITANTE, new Periodo(HOY, HOY.plusDays(3)), null, HOY, AHORA);
+            cuatroDias.enviar(flujo, ASIGNADOR, AHORA);
+
+            assertThat(tresDias.getPasos()).hasSize(1);
+            assertThat(cuatroDias.getPasos()).hasSize(2);
+        }
+
+        @Test
+        void cadaPasoUsaSuPropioTiempoLimite() {
+            var flujo = Solicitudes.flujoCon(List.of(
+                new PasoAprobacion(1, JEFE, null, 24), new PasoAprobacion(2, GERENTE, null, 72)));
+            var solicitud = Solicitudes.pendiente(flujo);
+            assertThat(solicitud.getFechaLimitePaso()).isEqualTo(AHORA.plus(Duration.ofHours(24)));
+
+            solicitud.aprobar(Solicitudes.JEFE, ASIGNADOR, AHORA);
+
+            assertThat(solicitud.getFechaLimitePaso()).isEqualTo(AHORA.plus(Duration.ofHours(72)));
+        }
+
+        @Test
+        void unFlujoDesactivadoImpideEnviarYNoCambiaLaSolicitud() {
+            var flujo = Flujo.reconstituir(new FlujoId(UUID.randomUUID()), TipoSolicitud.COMPRA, false,
+                UN_PASO.getPasos(), 1);
+            var solicitud = Solicitudes.enBorrador();
+
+            assertThatThrownBy(() -> solicitud.enviar(flujo, ASIGNADOR, AHORA))
+                .isInstanceOf(ReglaNegocioException.class);
+
+            assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.BORRADOR);
+        }
     }
 
     @Test

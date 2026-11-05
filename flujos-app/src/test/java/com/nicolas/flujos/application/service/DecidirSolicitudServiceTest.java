@@ -16,7 +16,8 @@ import com.nicolas.flujos.application.port.out.AuditoriaRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
-import com.nicolas.flujos.domain.regla.ReglaCompra;
+import com.nicolas.flujos.domain.flujo.PasoAprobacion;
+import com.nicolas.flujos.domain.flujo.RolAprobador;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.AccionNoPermitidaException;
@@ -29,10 +30,9 @@ import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
 import com.nicolas.flujos.domain.usuario.Rol;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -51,12 +51,11 @@ class DecidirSolicitudServiceTest {
 
     private final DecidirSolicitudService servicio = new DecidirSolicitudService(
         new AccesoSolicitudes(solicitudes, aprobaciones), solicitudes, aprobaciones, auditoria,
-        new ReglasAprobacionRegistry(List.of(new ReglaCompra(Duration.ofHours(48)))),
         (rol, solicitante) -> gerente, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
     void aprobarUnPasoIntermedioGuardaLaDecisionDeEsePaso() {
-        var solicitud = pendiente("5000");
+        var solicitud = pendiente(RolAprobador.JEFE, RolAprobador.GERENTE);
 
         var detalle = servicio.ejecutar(comando(solicitud, jefe, TipoDecision.APROBAR, "Visto bueno"));
 
@@ -75,7 +74,7 @@ class DecidirSolicitudServiceTest {
 
     @Test
     void rechazarDejaLaSolicitudRechazadaConSuMotivo() {
-        var solicitud = pendiente("500");
+        var solicitud = pendiente(RolAprobador.JEFE);
 
         var detalle = servicio.ejecutar(comando(solicitud, jefe, TipoDecision.RECHAZAR, "Sin presupuesto"));
 
@@ -86,7 +85,7 @@ class DecidirSolicitudServiceTest {
 
     @Test
     void rechazarSinMotivoNoGuardaNada() {
-        var solicitud = pendiente("500");
+        var solicitud = pendiente(RolAprobador.JEFE);
 
         assertThatThrownBy(() -> servicio.ejecutar(comando(solicitud, jefe, TipoDecision.RECHAZAR, " ")))
             .isInstanceOf(ReglaNegocioException.class);
@@ -97,7 +96,7 @@ class DecidirSolicitudServiceTest {
 
     @Test
     void quienVeLaSolicitudPeroNoEsElAprobadorNoPuedeDecidir() {
-        var solicitud = pendiente("500");
+        var solicitud = pendiente(RolAprobador.JEFE);
 
         assertThatThrownBy(() -> servicio.ejecutar(comando(solicitud, dueno, TipoDecision.APROBAR, null)))
             .isInstanceOf(AccionNoPermitidaException.class);
@@ -105,9 +104,13 @@ class DecidirSolicitudServiceTest {
         verify(aprobaciones, never()).registrar(any());
     }
 
-    private Solicitud pendiente(String monto) {
-        var solicitud = Solicitud.reconstituir(SolicitudId.nuevo(), dueno, TipoSolicitud.COMPRA, Money.de(monto, "USD"),
-            null, null, EstadoSolicitud.PENDIENTE, 1, jefe, AHORA, 1, AHORA, AHORA);
+    private Solicitud pendiente(RolAprobador... roles) {
+        var pasos = new ArrayList<PasoAprobacion>();
+        for (var rol : roles) {
+            pasos.add(new PasoAprobacion(pasos.size() + 1, rol, null, 48));
+        }
+        var solicitud = Solicitud.reconstituir(SolicitudId.nuevo(), dueno, TipoSolicitud.COMPRA, Money.de("500", "USD"),
+            null, null, EstadoSolicitud.PENDIENTE, pasos, 1, jefe, AHORA, 1, AHORA, AHORA);
         when(solicitudes.buscarPorId(solicitud.getId())).thenReturn(Optional.of(solicitud));
         return solicitud;
     }

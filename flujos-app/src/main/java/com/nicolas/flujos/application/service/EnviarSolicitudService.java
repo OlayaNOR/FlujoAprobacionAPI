@@ -4,10 +4,12 @@ import com.nicolas.flujos.application.port.in.Actor;
 import com.nicolas.flujos.application.port.in.EnviarSolicitudUseCase;
 import com.nicolas.flujos.application.port.in.SolicitudDetalle;
 import com.nicolas.flujos.application.port.out.AuditoriaRepository;
+import com.nicolas.flujos.application.port.out.FlujoRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
-import com.nicolas.flujos.domain.regla.AsignadorAprobador;
+import com.nicolas.flujos.domain.flujo.AsignadorAprobador;
+import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.solicitud.EstadoSolicitud;
 import com.nicolas.flujos.domain.solicitud.SolicitudId;
 import java.time.Clock;
@@ -20,16 +22,16 @@ class EnviarSolicitudService implements EnviarSolicitudUseCase {
 
     private final AccesoSolicitudes acceso;
     private final SolicitudRepository solicitudes;
-    private final ReglasAprobacionRegistry reglas;
+    private final FlujoRepository flujos;
     private final AsignadorAprobador asignador;
     private final AuditoriaRepository auditoria;
     private final Clock clock;
 
-    EnviarSolicitudService(AccesoSolicitudes acceso, SolicitudRepository solicitudes, ReglasAprobacionRegistry reglas,
+    EnviarSolicitudService(AccesoSolicitudes acceso, SolicitudRepository solicitudes, FlujoRepository flujos,
                            AsignadorAprobador asignador, AuditoriaRepository auditoria, Clock clock) {
         this.acceso = acceso;
         this.solicitudes = solicitudes;
-        this.reglas = reglas;
+        this.flujos = flujos;
         this.asignador = asignador;
         this.auditoria = auditoria;
         this.clock = clock;
@@ -42,7 +44,9 @@ class EnviarSolicitudService implements EnviarSolicitudUseCase {
         var estadoAnterior = solicitud.getEstado();
         var ahora = clock.instant();
 
-        solicitud.enviar(reglas.para(solicitud.getTipo()), asignador, ahora);
+        var flujo = flujos.buscarPorTipo(solicitud.getTipo()).orElseThrow(() ->
+            new ReglaNegocioException("No hay un flujo configurado para " + solicitud.getTipo()));
+        solicitud.enviar(flujo, asignador, ahora);
 
         solicitudes.guardar(solicitud);
         auditoria.registrar(solicitud.getEstado() == EstadoSolicitud.APROBADA

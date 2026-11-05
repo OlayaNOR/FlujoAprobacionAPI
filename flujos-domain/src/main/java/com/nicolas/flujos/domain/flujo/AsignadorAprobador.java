@@ -1,6 +1,5 @@
-package com.nicolas.flujos.domain.regla;
+package com.nicolas.flujos.domain.flujo;
 
-import com.nicolas.flujos.domain.flujo.RolAprobador;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
 
 @FunctionalInterface

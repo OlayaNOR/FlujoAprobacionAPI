@@ -1,5 +1,6 @@
 package com.nicolas.flujos.infrastructure.persistence;
 
+import com.nicolas.flujos.domain.flujo.PasoAprobacion;
 import com.nicolas.flujos.domain.solicitud.EstadoSolicitud;
 import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
 import jakarta.persistence.Column;
@@ -12,6 +13,7 @@ import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -42,6 +44,9 @@ class SolicitudEntity {
     LocalDate periodoFin;
 
     String motivo;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    List<PasoAprobacion> pasos;
 
     int pasoActual;
 

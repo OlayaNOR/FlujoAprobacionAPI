@@ -2,7 +2,7 @@ package com.nicolas.flujos.application.service;
 
 import com.nicolas.flujos.application.port.out.UsuarioRepository;
 import com.nicolas.flujos.domain.flujo.RolAprobador;
-import com.nicolas.flujos.domain.regla.AsignadorAprobador;
+import com.nicolas.flujos.domain.flujo.AsignadorAprobador;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
 import com.nicolas.flujos.domain.usuario.Usuario;
 import com.nicolas.flujos.domain.usuario.UsuarioId;

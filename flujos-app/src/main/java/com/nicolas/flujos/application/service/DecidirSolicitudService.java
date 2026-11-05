@@ -8,7 +8,7 @@ import com.nicolas.flujos.application.port.out.AuditoriaRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
 import com.nicolas.flujos.domain.auditoria.AccionAuditoria;
 import com.nicolas.flujos.domain.auditoria.RegistroAuditoria;
-import com.nicolas.flujos.domain.regla.AsignadorAprobador;
+import com.nicolas.flujos.domain.flujo.AsignadorAprobador;
 import com.nicolas.flujos.domain.solicitud.Decision;
 import com.nicolas.flujos.domain.solicitud.ResultadoDecision;
 import java.time.Clock;
@@ -24,18 +24,16 @@ class DecidirSolicitudService implements DecidirSolicitudUseCase {
     private final SolicitudRepository solicitudes;
     private final AprobacionRepository aprobaciones;
     private final AuditoriaRepository auditoria;
-    private final ReglasAprobacionRegistry reglas;
     private final AsignadorAprobador asignador;
     private final Clock clock;
 
     DecidirSolicitudService(AccesoSolicitudes acceso, SolicitudRepository solicitudes,
                             AprobacionRepository aprobaciones, AuditoriaRepository auditoria,
-                            ReglasAprobacionRegistry reglas, AsignadorAprobador asignador, Clock clock) {
+                            AsignadorAprobador asignador, Clock clock) {
         this.acceso = acceso;
         this.solicitudes = solicitudes;
         this.aprobaciones = aprobaciones;
         this.auditoria = auditoria;
-        this.reglas = reglas;
         this.asignador = asignador;
         this.clock = clock;
     }
@@ -53,7 +51,7 @@ class DecidirSolicitudService implements DecidirSolicitudUseCase {
 
         var resultado = switch (c.tipo()) {
             case APROBAR -> {
-                solicitud.aprobar(aprobador, reglas.para(solicitud.getTipo()), asignador, ahora);
+                solicitud.aprobar(aprobador, asignador, ahora);
                 yield ResultadoDecision.APROBADA;
             }
             case RECHAZAR -> {

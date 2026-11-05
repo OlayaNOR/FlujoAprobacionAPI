@@ -14,6 +14,8 @@ import com.nicolas.flujos.application.port.in.EditarSolicitudCommand;
 import com.nicolas.flujos.application.port.out.AprobacionRepository;
 import com.nicolas.flujos.application.port.out.IdempotenciaRepository;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
+import com.nicolas.flujos.domain.flujo.PasoAprobacion;
+import com.nicolas.flujos.domain.flujo.RolAprobador;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
@@ -30,6 +32,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Currency;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -159,7 +162,8 @@ class SolicitudServicesTest {
 
     private Solicitud pendiente() {
         var solicitud = Solicitud.reconstituir(SolicitudId.nuevo(), dueno, TipoSolicitud.COMPRA, CIEN, null, null,
-            EstadoSolicitud.PENDIENTE, 1, aprobador, AHORA, 1, AHORA, AHORA);
+            EstadoSolicitud.PENDIENTE, List.of(new PasoAprobacion(1, RolAprobador.JEFE, null, 48)), 1, aprobador, AHORA,
+            1, AHORA, AHORA);
         when(repositorio.buscarPorId(solicitud.getId())).thenReturn(Optional.of(solicitud));
         return solicitud;
     }

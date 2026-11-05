@@ -7,12 +7,17 @@ import com.nicolas.flujos.application.port.in.CampoOrden;
 import com.nicolas.flujos.application.port.in.FiltroSolicitud;
 import com.nicolas.flujos.application.port.in.PaginaSolicitada;
 import com.nicolas.flujos.application.port.out.SolicitudRepository;
+import com.nicolas.flujos.domain.flujo.Flujo;
+import com.nicolas.flujos.domain.flujo.FlujoId;
+import com.nicolas.flujos.domain.flujo.PasoAprobacion;
+import com.nicolas.flujos.domain.flujo.RolAprobador;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
 import com.nicolas.flujos.domain.solicitud.EstadoSolicitud;
 import com.nicolas.flujos.domain.solicitud.Solicitud;
 import com.nicolas.flujos.domain.solicitud.TipoSolicitud;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -86,6 +91,21 @@ class SolicitudRepositoryIT {
         assertThat(leida.getMotivo()).isEqualTo("Licencias");
         assertThat(leida.getCreadaEn()).isEqualTo(AHORA);
         assertThat(leida.getVersion()).isZero();
+    }
+
+    @Test
+    void guardaYRecuperaLosPasosCopiadosAlEnviar() {
+        var pasos = List.of(new PasoAprobacion(1, RolAprobador.JEFE, null, 24),
+            new PasoAprobacion(2, RolAprobador.GERENTE, new BigDecimal("1000.00"), 72));
+        var jefe = crearUsuario();
+        var flujo = Flujo.reconstituir(new FlujoId(UUID.randomUUID()), TipoSolicitud.COMPRA, true, pasos, 1);
+        var solicitud = compra(crearUsuario(), "1250.50");
+        solicitud.enviar(flujo, (rol, solicitante) -> jefe, AHORA);
+
+        guardar(solicitud);
+        var leida = repositorio.buscarPorId(solicitud.getId()).orElseThrow();
+
+        assertThat(leida.getPasos()).containsExactlyElementsOf(pasos);
     }
 
     @Test

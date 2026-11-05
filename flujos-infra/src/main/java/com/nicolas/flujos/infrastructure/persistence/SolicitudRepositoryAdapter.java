@@ -42,6 +42,7 @@ class SolicitudRepositoryAdapter implements SolicitudRepository {
         entidad.periodoInicio = s.getPeriodo() == null ? null : s.getPeriodo().inicio();
         entidad.periodoFin = s.getPeriodo() == null ? null : s.getPeriodo().fin();
         entidad.motivo = s.getMotivo();
+        entidad.pasos = s.getPasos();
         entidad.pasoActual = s.getPasoActual();
         entidad.aprobadorActualId = s.getAprobadorActualId() == null ? null : s.getAprobadorActualId().valor();
         entidad.fechaLimitePaso = s.getFechaLimitePaso();
@@ -81,7 +82,7 @@ class SolicitudRepositoryAdapter implements SolicitudRepository {
         var monto = e.monto == null ? null : new Money(e.monto, Currency.getInstance(e.moneda));
         var periodo = e.periodoInicio == null ? null : new Periodo(e.periodoInicio, e.periodoFin);
         return Solicitud.reconstituir(new SolicitudId(e.id), new UsuarioId(e.solicitanteId), e.tipo, monto, periodo,
-            e.motivo, e.estado, e.pasoActual, aId(e.aprobadorActualId), e.fechaLimitePaso, e.version,
+            e.motivo, e.estado, e.pasos, e.pasoActual, aId(e.aprobadorActualId), e.fechaLimitePaso, e.version,
             e.creadaEn, e.actualizadaEn);
     }
 

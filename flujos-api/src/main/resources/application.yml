@@ -26,7 +26,6 @@ app:
       audiencia: flujos-clientes
   negocio:
     moneda-base: USD
-    tiempo-limite-paso-horas: 48
 
 management:
   endpoints:

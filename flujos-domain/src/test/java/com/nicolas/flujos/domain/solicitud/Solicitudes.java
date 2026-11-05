@@ -1,16 +1,19 @@
 package com.nicolas.flujos.domain.solicitud;
 
+import com.nicolas.flujos.domain.flujo.AsignadorAprobador;
+import com.nicolas.flujos.domain.flujo.Flujo;
+import com.nicolas.flujos.domain.flujo.FlujoId;
 import com.nicolas.flujos.domain.flujo.PasoAprobacion;
 import com.nicolas.flujos.domain.flujo.RolAprobador;
-import com.nicolas.flujos.domain.regla.AsignadorAprobador;
-import com.nicolas.flujos.domain.regla.ReglaAprobacion;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
+import java.util.UUID;
 
 public final class Solicitudes {
 
@@ -33,23 +36,16 @@ public final class Solicitudes {
     private Solicitudes() {
     }
 
-    public static ReglaAprobacion reglaCon(RolAprobador... roles) {
-        return new ReglaAprobacion() {
-            @Override
-            public TipoSolicitud tipo() {
-                return TipoSolicitud.COMPRA;
-            }
+    public static Flujo flujoCon(RolAprobador... roles) {
+        var pasos = new ArrayList<PasoAprobacion>();
+        for (var rol : roles) {
+            pasos.add(new PasoAprobacion(pasos.size() + 1, rol, null, (int) LIMITE.toHours()));
+        }
+        return flujoCon(pasos);
+    }
 
-            @Override
-            public List<PasoAprobacion> pasosRequeridos(Solicitud solicitud) {
-                return PasoAprobacion.secuencia(LIMITE, roles);
-            }
-
-            @Override
-            public Duration tiempoLimitePorPaso() {
-                return LIMITE;
-            }
-        };
+    public static Flujo flujoCon(List<PasoAprobacion> pasos) {
+        return Flujo.reconstituir(new FlujoId(UUID.randomUUID()), TipoSolicitud.COMPRA, true, pasos, 1);
     }
 
     public static Solicitud compra(String monto) {
@@ -60,9 +56,9 @@ public final class Solicitudes {
         return compra("500");
     }
 
-    public static Solicitud pendiente(ReglaAprobacion regla) {
+    public static Solicitud pendiente(Flujo flujo) {
         var solicitud = enBorrador();
-        solicitud.enviar(regla, ASIGNADOR, AHORA);
+        solicitud.enviar(flujo, ASIGNADOR, AHORA);
         solicitud.pullEventos();
         return solicitud;
     }

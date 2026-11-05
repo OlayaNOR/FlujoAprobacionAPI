@@ -1,8 +1,8 @@
 package com.nicolas.flujos.domain.solicitud;
 
+import com.nicolas.flujos.domain.flujo.AsignadorAprobador;
+import com.nicolas.flujos.domain.flujo.Flujo;
 import com.nicolas.flujos.domain.flujo.PasoAprobacion;
-import com.nicolas.flujos.domain.regla.AsignadorAprobador;
-import com.nicolas.flujos.domain.regla.ReglaAprobacion;
 import com.nicolas.flujos.domain.shared.Money;
 import com.nicolas.flujos.domain.shared.Periodo;
 import com.nicolas.flujos.domain.shared.ReglaNegocioException;
@@ -11,6 +11,8 @@ import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudEnviada;
 import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudEscalada;
 import com.nicolas.flujos.domain.solicitud.EventoDominio.SolicitudRechazada;
 import com.nicolas.flujos.domain.usuario.UsuarioId;
+import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ public final class Solicitud {
     private Periodo periodo;
     private String motivo;
     private EstadoSolicitud estado = EstadoSolicitud.BORRADOR;
+    private List<PasoAprobacion> pasos = List.of();
     private int pasoActual = SIN_PASO;
     private UsuarioId aprobadorActualId;
     private Instant fechaLimitePaso;
@@ -51,12 +54,14 @@ public final class Solicitud {
     /** Para cargar desde persistencia: no valida fechas porque un periodo ya pasado sigue siendo correcto. */
     public static Solicitud reconstituir(SolicitudId id, UsuarioId solicitanteId, TipoSolicitud tipo,
                                          Money monto, Periodo periodo, String motivo, EstadoSolicitud estado,
-                                         int pasoActual, UsuarioId aprobadorActualId, Instant fechaLimitePaso,
+                                         List<PasoAprobacion> pasos, int pasoActual, UsuarioId aprobadorActualId,
+                                         Instant fechaLimitePaso,
                                          long version, Instant creadaEn, Instant actualizadaEn) {
         var solicitud = new Solicitud(id, solicitanteId, tipo, motivo, creadaEn);
         solicitud.monto = monto;
         solicitud.periodo = periodo;
         solicitud.estado = Objects.requireNonNull(estado);
+        solicitud.pasos = List.copyOf(pasos);
         solicitud.pasoActual = pasoActual;
         solicitud.aprobadorActualId = aprobadorActualId;
         solicitud.fechaLimitePaso = fechaLimitePaso;
@@ -109,9 +114,10 @@ public final class Solicitud {
         this.actualizadaEn = ahora;
     }
 
-    public void enviar(ReglaAprobacion regla, AsignadorAprobador asignador, Instant ahora) {
+    /** Los pasos del flujo quedan copiados aquí: cambiar el flujo después no afecta a esta solicitud. */
+    public void enviar(Flujo flujo, AsignadorAprobador asignador, Instant ahora) {
         validarEstadoOrigen(EstadoSolicitud.BORRADOR, EstadoSolicitud.PENDIENTE);
-        var pasos = regla.pasosRequeridos(this);
+        this.pasos = flujo.pasosPara(magnitud());
 
         if (pasos.isEmpty()) {
             finalizar(EstadoSolicitud.APROBADA, ahora);
@@ -120,20 +126,19 @@ public final class Solicitud {
         }
 
         this.estado = EstadoSolicitud.PENDIENTE;
-        avanzarAlPaso(1, pasos, regla, asignador, ahora);
+        avanzarAlPaso(1, asignador, ahora);
         eventos.add(new SolicitudEnviada(id, aprobadorActualId, ahora));
     }
 
-    public void aprobar(UsuarioId aprobador, ReglaAprobacion regla, AsignadorAprobador asignador, Instant ahora) {
+    public void aprobar(UsuarioId aprobador, AsignadorAprobador asignador, Instant ahora) {
         validarTransicion(EstadoSolicitud.APROBADA);
         validarAprobadorDelPaso(aprobador);
-        var pasos = regla.pasosRequeridos(this);
 
         if (pasoActual >= pasos.size()) {
             finalizar(EstadoSolicitud.APROBADA, ahora);
             eventos.add(new SolicitudAprobada(id, ahora));
         } else {
-            avanzarAlPaso(pasoActual + 1, pasos, regla, asignador, ahora);
+            avanzarAlPaso(pasoActual + 1, asignador, ahora);
             eventos.add(new SolicitudEnviada(id, aprobadorActualId, ahora));
         }
     }
@@ -163,15 +168,14 @@ public final class Solicitud {
         this.actualizadaEn = ahora;
     }
 
-    public void escalar(ReglaAprobacion regla, AsignadorAprobador asignador, Instant ahora) {
+    public void escalar(AsignadorAprobador asignador, Instant ahora) {
         validarEstadoOrigen(EstadoSolicitud.PENDIENTE, EstadoSolicitud.PENDIENTE);
         if (!estaVencida(ahora)) {
             return;
         }
-        var pasos = regla.pasosRequeridos(this);
 
         if (pasoActual < pasos.size()) {
-            avanzarAlPaso(pasoActual + 1, pasos, regla, asignador, ahora);
+            avanzarAlPaso(pasoActual + 1, asignador, ahora);
             eventos.add(new SolicitudEscalada(id, pasoActual, false, ahora));
         } else {
             // sin fecha límite el job no la vuelve a tomar en cada corrida
@@ -197,13 +201,17 @@ public final class Solicitud {
         return copia;
     }
 
-    private void avanzarAlPaso(int paso, List<PasoAprobacion> pasos, ReglaAprobacion regla,
-                               AsignadorAprobador asignador, Instant ahora) {
-        var rol = pasos.get(paso - 1).rolAprobador();
-        this.aprobadorActualId = Objects.requireNonNull(asignador.aprobadorPara(rol, solicitanteId));
-        this.pasoActual = paso;
-        this.fechaLimitePaso = ahora.plus(regla.tiempoLimitePorPaso());
+    private void avanzarAlPaso(int numero, AsignadorAprobador asignador, Instant ahora) {
+        var paso = pasos.get(numero - 1);
+        this.aprobadorActualId = Objects.requireNonNull(asignador.aprobadorPara(paso.rolAprobador(), solicitanteId));
+        this.pasoActual = numero;
+        this.fechaLimitePaso = ahora.plus(Duration.ofHours(paso.tiempoLimiteHoras()));
         this.actualizadaEn = ahora;
+    }
+
+    // Contra lo que se comparan los umbrales del flujo
+    private BigDecimal magnitud() {
+        return tipo == TipoSolicitud.VACACIONES ? BigDecimal.valueOf(periodo.dias()) : monto.valor();
     }
 
     private void finalizar(EstadoSolicitud estadoFinal, Instant ahora) {
@@ -292,6 +300,10 @@ public final class Solicitud {
 
     public EstadoSolicitud getEstado() {
         return estado;
+    }
+
+    public List<PasoAprobacion> getPasos() {
+        return pasos;
     }
 
     public int getPasoActual() {
